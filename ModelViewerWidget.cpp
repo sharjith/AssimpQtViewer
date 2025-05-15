@@ -127,6 +127,8 @@ void ModelViewerWidget::updateCamera() {
 void ModelViewerWidget::paintGL() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+    glClearColor(0.5f, 0.5f, 0.5f, 1.0f);
+
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     float nearPlane = _viewRadius * 0.1f;
@@ -136,17 +138,27 @@ void ModelViewerWidget::paintGL() {
     glLoadIdentity();
 
     // Convert spherical coordinates to Cartesian
+    // Convert spherical angles to Cartesian direction
     float radAzim = qDegreesToRadians(m_azimuth);
     float radElev = qDegreesToRadians(m_elevation);
-    float x = _cameraDistance * m_zoom * std::cos(radElev) * std::sin(radAzim);
-    float y = _cameraDistance * m_zoom * std::sin(radElev);
-    float z = _cameraDistance * m_zoom * std::cos(radElev) * std::cos(radAzim);
 
-    gluLookAt(
-        x + _viewCenter.x, y + _viewCenter.y, z + _viewCenter.z,  // camera position
-        _viewCenter.x, _viewCenter.y, _viewCenter.z,              // target
-        0.0f, 1.0f, 0.0f                                          // up vector
-    );
+    // Forward (from camera to target)
+    QVector3D forward = {
+        std::cos(radElev) * std::sin(radAzim),
+        std::sin(radElev),
+        std::cos(radElev) * std::cos(radAzim)
+    };
+
+    QVector3D cameraPos = QVector3D(_viewCenter.x, _viewCenter.y, _viewCenter.z)
+                          + (-forward.normalized() * _cameraDistance * m_zoom);
+
+    QVector3D up = QVector3D(0, 1, 0);
+
+    // Use gluLookAt with dynamic camera
+    glLoadIdentity();
+    gluLookAt(cameraPos.x(), cameraPos.y(), cameraPos.z(),
+              _viewCenter.x, _viewCenter.y, _viewCenter.z,
+              up.x(), up.y(), up.z());
 
     //glTranslatef(-_viewCenter.x, -_viewCenter.y, -_viewCenter.z);
 
@@ -230,29 +242,32 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
     m_lastMousePos = event->pos();
 
     if (m_mode == InteractionMode::Rotate) {
-        m_azimuth += delta.x() * 0.5f;
-        m_elevation += delta.y() * 0.5f;
+        m_azimuth -= delta.x() * 0.5f;
+        m_elevation -= delta.y() * 0.5f;
         m_elevation = std::clamp(m_elevation, -89.0f, 89.0f);
     }
     else if (m_mode == InteractionMode::Pan) {
+        float panSpeed = _viewRadius * 0.002f;
+
         float radAzim = qDegreesToRadians(m_azimuth);
         float radElev = qDegreesToRadians(m_elevation);
 
-        // Right vector in world space
-        aiVector3D right(std::cos(radAzim), 0, -std::sin(radAzim));
+        // Forward vector from spherical coordinates
+        aiVector3D forward(
+            std::cos(radElev) * std::sin(radAzim),
+            std::sin(radElev),
+            std::cos(radElev) * std::cos(radAzim)
+        );
 
-        // Approximate up vector (in camera space, global Y up)
+        // Right and up vectors (camera space)
         aiVector3D up(0, 1, 0);
-
+        aiVector3D right = forward ^ up; // Cross product
         right.Normalize();
-        up.Normalize();
+        aiVector3D cameraUp = right ^ forward;
+        cameraUp.Normalize();
 
-        // Pan speed scaled by distance
-        float panSpeed = _cameraDistance * 0.001f;
-
-        // Apply panning to the view center
         _viewCenter -= right * (delta.x() * panSpeed);
-        _viewCenter += up * (delta.y() * panSpeed);
+        _viewCenter += cameraUp * (delta.y() * panSpeed);
     }
 
     update();
@@ -268,7 +283,7 @@ void ModelViewerWidget::wheelEvent(QWheelEvent* event)
 {
     QPoint numDegrees = event->angleDelta() / 8;
     if (!numDegrees.isNull()) {
-        m_zoom *= 1.0f + numDegrees.y() / 240.0f;
+        m_zoom *= 1.0f - numDegrees.y() / 240.0f;
     }
     update();
 }
