@@ -42,9 +42,15 @@ target_link_libraries(AssimpQtViewer PRIVATE
 	Qt6::OpenGL
 	Qt6::Widgets
     OpenGL::GL
-	glu32
     assimp::assimp
 )
+
+if(WIN32)
+	target_link_libraries(AssimpQtViewer PRIVATE glu32)
+elseif(UNIX)
+	find_package(GLU REQUIRED)
+	target_link_libraries(AssimpQtViewer PRIVATE OpenGL::GLU)
+endif()
 
 # This ensures include directories from linked Qt targets are added
 target_include_directories(AssimpQtViewer PRIVATE

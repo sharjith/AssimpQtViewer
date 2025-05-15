@@ -5,6 +5,8 @@
 #include <QMouseEvent>
 #include <QDebug>
 #include <assimp/postprocess.h>
+#include <cfloat>
+
 #ifdef _WIN32
 #include <windows.h>
 #endif
