@@ -1,0 +1,3 @@
+D:/work/progs/Qt6/AssimpQtViewer/build/CMakeFiles/AssimpQtViewer.dir
+D:/work/progs/Qt6/AssimpQtViewer/build/CMakeFiles/ALL_BUILD.dir
+D:/work/progs/Qt6/AssimpQtViewer/build/CMakeFiles/ZERO_CHECK.dir
