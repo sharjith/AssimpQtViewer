@@ -56,3 +56,18 @@ endif()
 target_include_directories(AssimpQtViewer PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
+
+if(WIN32)
+    # Automatically detect the Qt bin folder (assumes Qt6::qmake is found)
+    get_target_property(QT_QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
+    get_filename_component(QT_BIN_DIR "${QT_QMAKE_EXECUTABLE}" DIRECTORY)
+    
+    add_custom_command(TARGET AssimpQtViewer POST_BUILD
+        COMMAND "${QT_BIN_DIR}/windeployqt.exe"
+            --no-compiler-runtime
+            --no-opengl-sw
+            --no-translations
+            "$<TARGET_FILE:AssimpQtViewer>"
+        COMMENT "Running windeployqt to copy Qt dependencies"        
+    )
+endif()

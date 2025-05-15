@@ -26,6 +26,12 @@ ModelViewerWidget::ModelViewerWidget(QWidget *parent)
 
     _viewRadius = 1000;
 	_cameraDistance = 500;
+    _sceneUpdated = false;
+	m_zoom = 1.0f;  
+    float m_azimuth = 0.0f;     // Horizontal angle in degrees
+    float m_elevation = 20.0f;  // Vertical angle in degrees
+
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 void ModelViewerWidget::initializeGL() {
@@ -109,19 +115,40 @@ void ModelViewerWidget::updateCamera() {
     // Ideal distance from camera to model center based on FOV
     float fovYRadians = 45.0f * M_PI / 180.0f;
     _cameraDistance = _viewRadius / std::tan(fovYRadians * 0.5f);
+
+    // Set default camera position: looking from +Z axis
+    _cameraPos = aiVector3D(_viewCenter.x, _viewCenter.y, _viewCenter.z + _cameraDistance);
+    _upVector = aiVector3D(0, 1, 0);
+
+    _sceneUpdated = true;
+    m_zoom = 1.0f;
 }
 
 void ModelViewerWidget::paintGL() {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    float nearPlane = _viewRadius * 0.1f;
+    float farPlane = _viewRadius * 10.0f;
+    gluPerspective(45.0, float(width()) / height(), nearPlane, farPlane);
+    glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-    // Apply transform    	
-    glTranslatef(0, 0, -_cameraDistance * m_zoom);
-    glTranslatef(m_panX, m_panY, 0);
-    glRotatef(m_rotationX, 1, 0, 0);
-    glRotatef(m_rotationY, 0, 1, 0);
+    // Convert spherical coordinates to Cartesian
+    float radAzim = qDegreesToRadians(m_azimuth);
+    float radElev = qDegreesToRadians(m_elevation);
+    float x = _cameraDistance * m_zoom * std::cos(radElev) * std::sin(radAzim);
+    float y = _cameraDistance * m_zoom * std::sin(radElev);
+    float z = _cameraDistance * m_zoom * std::cos(radElev) * std::cos(radAzim);
 
-    glTranslatef(-_viewCenter.x, -_viewCenter.y, -_viewCenter.z);
+    gluLookAt(
+        x + _viewCenter.x, y + _viewCenter.y, z + _viewCenter.z,  // camera position
+        _viewCenter.x, _viewCenter.y, _viewCenter.z,              // target
+        0.0f, 1.0f, 0.0f                                          // up vector
+    );
+
+    //glTranslatef(-_viewCenter.x, -_viewCenter.y, -_viewCenter.z);
 
     if (!scene) {
         // draw test triangle
@@ -138,9 +165,9 @@ void ModelViewerWidget::paintGL() {
 }
 
 void ModelViewerWidget::loadModel(const QString &filePath) {
+	resetView();
     scene = importer.ReadFile(filePath.toStdString(), aiProcess_Triangulate | aiProcess_GenNormals);
     updateCamera();
-	resizeGL(width(), height());
     update();
 }
 
@@ -203,12 +230,29 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
     m_lastMousePos = event->pos();
 
     if (m_mode == InteractionMode::Rotate) {
-        m_rotationX += delta.y();
-        m_rotationY += delta.x();
+        m_azimuth += delta.x() * 0.5f;
+        m_elevation += delta.y() * 0.5f;
+        m_elevation = std::clamp(m_elevation, -89.0f, 89.0f);
     }
     else if (m_mode == InteractionMode::Pan) {
-        m_panX += delta.x() * 0.5f;
-        m_panY -= delta.y() * 0.5f;
+        float radAzim = qDegreesToRadians(m_azimuth);
+        float radElev = qDegreesToRadians(m_elevation);
+
+        // Right vector in world space
+        aiVector3D right(std::cos(radAzim), 0, -std::sin(radAzim));
+
+        // Approximate up vector (in camera space, global Y up)
+        aiVector3D up(0, 1, 0);
+
+        right.Normalize();
+        up.Normalize();
+
+        // Pan speed scaled by distance
+        float panSpeed = _cameraDistance * 0.001f;
+
+        // Apply panning to the view center
+        _viewCenter -= right * (delta.x() * panSpeed);
+        _viewCenter += up * (delta.y() * panSpeed);
     }
 
     update();
@@ -226,5 +270,92 @@ void ModelViewerWidget::wheelEvent(QWheelEvent* event)
     if (!numDegrees.isNull()) {
         m_zoom *= 1.0f + numDegrees.y() / 240.0f;
     }
+    update();
+}
+
+void ModelViewerWidget::keyPressEvent(QKeyEvent* event) {
+    switch (event->key()) {
+    case Qt::Key_T:  // Top view (looking down -Y axis)
+		setViewProjection(ViewProjection::Top);
+        break;
+    case Qt::Key_F:  // Front view (looking along +Z)
+		setViewProjection(ViewProjection::Front);
+        break;
+    case Qt::Key_L:  // Left view (looking along -X)
+		setViewProjection(ViewProjection::Left);
+        break;
+    case Qt::Key_A:  // Axonometric (isometric) view
+		setViewProjection(ViewProjection::Axonometric);
+        break;
+    case Qt::Key_H:  // Home / Fit all
+        updateCamera();
+        break;
+    }
+    update();
+}
+
+
+void ModelViewerWidget::resetView() {
+    m_rotationX = 0.0f;
+    m_rotationY = 0.0f;
+    m_panX = 0.0f;
+    m_panY = 0.0f;
+    m_zoom = 1.0f;
+    _cameraDistance = 0.0f;
+    _viewCenter = aiVector3D(0, 0, 0);
+    _viewRadius = 1.0f;
+}
+
+void ModelViewerWidget::setViewProjection(ViewProjection view)
+{
+    m_viewProjection = view;
+    switch (view) {
+    case ViewProjection::Top:
+		setViewTop();
+        break;
+    case ViewProjection::Front:
+		setViewFront();
+        break;
+    case ViewProjection::Left:
+		setViewLeft();
+        break;
+    case ViewProjection::Axonometric:
+		setViewAxonometric();        
+        break;
+    case ViewProjection::Custom:
+    default:
+        // Do nothing or reset to user-controlled
+        break;
+    }
+    m_zoom = 1.0f;
+    update();
+}
+
+
+void ModelViewerWidget::setViewTop() {
+    m_azimuth = 0;
+    m_elevation = 90;   // looking straight down
+    m_zoom = 1.0f;
+    update();
+}
+
+void ModelViewerWidget::setViewFront() {
+    m_azimuth = 0;
+    m_elevation = 0;
+    m_zoom = 1.0f;
+    update();
+}
+
+void ModelViewerWidget::setViewLeft() {
+    m_azimuth = 90;
+    m_elevation = 0;
+    m_zoom = 1.0f;
+    update();
+}
+
+void ModelViewerWidget::setViewAxonometric() {
+    m_azimuth = 45;
+    m_elevation = 35;
+    m_zoom = 1.0f;
     update();
 }
