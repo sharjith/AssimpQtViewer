@@ -3,6 +3,7 @@
 #include <QMainWindow>
 #include "ModelViewerWidget.h"
 #include <QTreeWidget>
+#include <QProgressBar>
 #include "HighlightDelegate.h"
 
 class MainWindow : public QMainWindow {
@@ -10,8 +11,8 @@ class MainWindow : public QMainWindow {
 public:
     MainWindow(QWidget *parent = nullptr);
 private:
-    ModelViewerWidget *viewer;
-    QTreeWidget *tree;
+    ModelViewerWidget *_viewer;
+    QTreeWidget *_treeWidget;
     void loadModel(const QString &path);
     void populateTree(const aiScene *scene);
 private slots:
@@ -19,5 +20,7 @@ private slots:
     void filterTree(const QString& text);
 
 private:
-    HighlightDelegate* m_highlightDelegate;
+    HighlightDelegate* _highlightDelegate;
+    QLineEdit* _searchBox;
+    QProgressBar* _progressBar;
 };

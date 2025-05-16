@@ -231,7 +231,7 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
     m_lastMousePos = event->pos();
 
     if (m_mode == InteractionMode::Rotate) {
-        m_azimuth += delta.x() * 0.5f;
+        m_azimuth -= delta.x() * 0.5f;
         m_elevation += delta.y() * 0.5f;
         m_elevation = std::clamp(m_elevation, -89.0f, 89.0f);
     }

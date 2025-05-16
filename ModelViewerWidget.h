@@ -21,6 +21,7 @@ public:
     void loadModel(const QString &filePath);
     const aiScene* getScene() const { return scene; }
     void highlightNode(aiNode *node);
+	Assimp::Importer* getImporter() { return &importer; }
 protected:
     void initializeGL() override;
     void resizeGL(int w, int h) override;

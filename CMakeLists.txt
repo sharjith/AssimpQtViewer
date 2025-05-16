@@ -13,7 +13,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
 # Find Qt
-find_package(Qt6 REQUIRED COMPONENTS Core Gui OpenGLWidgets Widgets OpenGL)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui OpenGLWidgets Widgets OpenGL Concurrent)
 
 # Find OpenGL and Assimp
 find_package(OpenGL REQUIRED)
@@ -31,6 +31,7 @@ set(HEADERS
 	MainWindow.h
     ModelViewerWidget.h    
     HighlightDelegate.h
+    QtAssimpProgressHandler.h
 )
 
 # Main executable
@@ -43,6 +44,7 @@ target_link_libraries(AssimpQtViewer PRIVATE
     Qt6::OpenGLWidgets
 	Qt6::OpenGL
 	Qt6::Widgets
+    Qt6::Concurrent
     OpenGL::GL
     assimp::assimp
 )
