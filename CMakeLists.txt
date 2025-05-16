@@ -24,11 +24,13 @@ set(SOURCES
     main.cpp
 	MainWindow.cpp
     ModelViewerWidget.cpp    
+    HighlightDelegate.cpp
 )
 
 set(HEADERS
 	MainWindow.h
     ModelViewerWidget.h    
+    HighlightDelegate.h
 )
 
 # Main executable
