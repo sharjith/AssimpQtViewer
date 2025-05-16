@@ -3,6 +3,7 @@
 #include <QOpenGLWidget>
 #include <QOpenGLFunctions>
 #include <QString>
+#include <QToolButton>
 #include <assimp/scene.h>
 #include <assimp/Importer.hpp>
 
