@@ -36,6 +36,8 @@ protected:
 	void focusInEvent(QFocusEvent* event) override;
 	void focusOutEvent(QFocusEvent* event) override;*/
 
+    void resizeEvent(QResizeEvent* event);
+
 private:
 	void updateCamera();
     void resetView();
@@ -43,7 +45,9 @@ private:
     void setViewTop();
     void setViewFront();
     void setViewLeft();
-    void setViewAxonometric();
+    void setViewAxonometric();    
+    void fitToView();
+    QToolButton* createViewButton(const QString& iconPath, const QString& tooltip, const std::function<void()>& callback, QWidget* parent = nullptr);
 
 private:
     const aiScene *scene = nullptr;
@@ -71,4 +75,7 @@ private:
     InteractionMode m_mode = InteractionMode::None;
 
 	ViewProjection m_viewProjection = ViewProjection::Custom;
+
+    QWidget* _viewToolbar;
+
 };

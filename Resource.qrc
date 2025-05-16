@@ -1,0 +1,9 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file>res/fit-all.png</file>
+        <file>res/front.png</file>
+        <file>res/isometric.png</file>
+        <file>res/left.png</file>
+        <file>res/top.png</file>
+    </qresource>
+</RCC>

@@ -24,7 +24,8 @@ set(SOURCES
     main.cpp
 	MainWindow.cpp
     ModelViewerWidget.cpp    
-    HighlightDelegate.cpp
+    HighlightDelegate.cpp    
+    Resource.qrc
 )
 
 set(HEADERS
@@ -36,6 +37,8 @@ set(HEADERS
 
 # Main executable
 add_executable(AssimpQtViewer ${SOURCES} ${HEADERS})
+
+
 
 # Link Qt modules and other dependencies
 target_link_libraries(AssimpQtViewer PRIVATE

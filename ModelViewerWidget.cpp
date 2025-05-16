@@ -4,6 +4,9 @@
 #include <QMatrix4x4>
 #include <QMouseEvent>
 #include <QDebug>
+#include <QHBoxLayout>
+#include <QPushButton>
+#include <QToolButton>
 #include <assimp/postprocess.h>
 #include <cfloat>
 
@@ -31,8 +34,37 @@ ModelViewerWidget::ModelViewerWidget(QWidget *parent)
     float m_azimuth = 0.0f;     // Horizontal angle in degrees
     float m_elevation = 20.0f;  // Vertical angle in degrees
 
+    _viewToolbar = new QWidget(this);
+    _viewToolbar->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+    _viewToolbar->setStyleSheet("background: rgba(255, 255, 255, 100); border: 1px solid gray; border-radius: 4px;");
+    _viewToolbar->setFixedHeight(64);
+    
+
+    QHBoxLayout* layout = new QHBoxLayout(_viewToolbar);
+    layout->setContentsMargins(4, 4, 4, 4);
+    layout->setSpacing(6);
+
+    layout->addWidget(createViewButton(":/icons/res/top.png", "Top View", [this]() { setViewTop(); }, _viewToolbar));
+    layout->addWidget(createViewButton(":/icons/res/front.png", "Front View", [this]() { setViewFront(); }, _viewToolbar));
+    layout->addWidget(createViewButton(":/icons/res/left.png", "Left View", [this]() { setViewLeft(); }, _viewToolbar));
+    layout->addWidget(createViewButton(":/icons/res/isometric.png", "Isometric View", [this]() { setViewAxonometric(); }, _viewToolbar));
+    layout->addWidget(createViewButton(":/icons/res/fit-all.png", "Fit All", [this]() { fitToView(); }, _viewToolbar));
+    
+    qDebug() << QIcon(":/icons/res/top.png").isNull();
+
     setFocusPolicy(Qt::StrongFocus);
 }
+
+QToolButton* ModelViewerWidget::createViewButton(const QString& iconPath, const QString& tooltip, const std::function<void()>& callback, QWidget* parent) {
+    QToolButton* button = new QToolButton(parent);
+    button->setIcon(QIcon(iconPath));
+    button->setIconSize(QSize(64, 64));
+    button->setToolTip(tooltip);
+    button->setAutoRaise(true);  // Flat appearance
+    QObject::connect(button, &QToolButton::clicked, callback);
+    return button;
+}
+
 
 void ModelViewerWidget::initializeGL() {
     initializeOpenGLFunctions();
@@ -295,6 +327,25 @@ void ModelViewerWidget::keyPressEvent(QKeyEvent* event) {
     update();
 }
 
+void ModelViewerWidget::resizeEvent(QResizeEvent* event) {
+    QOpenGLWidget::resizeEvent(event);
+    QWidget::resizeEvent(event);
+    if (_viewToolbar) {
+        _viewToolbar->adjustSize();
+        QSize toolbarSize = _viewToolbar->size();
+        int margin = 10;
+
+        int x = (width() - toolbarSize.width()) / 2;
+        int y = height() - toolbarSize.height() - margin;
+
+        // Clamp to ensure it's inside bounds
+        x = std::max(0, x);
+        y = std::max(0, y);
+
+        _viewToolbar->move(x, y);
+    }
+}
+
 
 void ModelViewerWidget::resetView() {
     m_rotationX = 0.0f;
@@ -358,5 +409,11 @@ void ModelViewerWidget::setViewAxonometric() {
     m_azimuth = 45;
     m_elevation = 35;
     m_zoom = 1.0f;
+    update();
+}
+
+void ModelViewerWidget::fitToView() {
+    // Optional: adjust _cameraDistance or zoom to fit model bounds
+	updateCamera();
     update();
 }
