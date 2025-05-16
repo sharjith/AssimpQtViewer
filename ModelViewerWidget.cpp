@@ -175,10 +175,12 @@ void ModelViewerWidget::paintGL() {
     float y = _cameraDistance * m_zoom * std::sin(radElev);
     float z = _cameraDistance * m_zoom * std::cos(radElev) * std::cos(radAzim);
 
+    aiVector3D up = (std::cos(radElev) >= 0) ? aiVector3D(0, 1, 0) : aiVector3D(0, -1, 0);
+
     gluLookAt(
         x + _viewCenter.x, y + _viewCenter.y, z + _viewCenter.z,  // camera position
         _viewCenter.x, _viewCenter.y, _viewCenter.z,              // target
-        0.0f, 1.0f, 0.0f                                          // up vector
+        up.x, up.y, up.z                                          // up vector
     );
 
     //glTranslatef(-_viewCenter.x, -_viewCenter.y, -_viewCenter.z);
@@ -265,7 +267,7 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
     if (m_mode == InteractionMode::Rotate) {
         m_azimuth -= delta.x() * 0.5f;
         m_elevation += delta.y() * 0.5f;
-        m_elevation = std::clamp(m_elevation, -89.0f, 89.0f);
+        //m_elevation = std::clamp(m_elevation, -89.0f, 89.0f);
     }
     else if (m_mode == InteractionMode::Pan) {
         float radAzim = qDegreesToRadians(m_azimuth);
