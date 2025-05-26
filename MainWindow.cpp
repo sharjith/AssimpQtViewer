@@ -210,10 +210,6 @@ void MainWindow::filterTree(const QString& text) {
 		++it;
 	}
 
-	if (text.isEmpty()) {
-		m_treeWidget->collapseAll();  // Optional: collapse everything when cleared
-	}
-
 	m_treeWidget->viewport()->update();
 }
 
