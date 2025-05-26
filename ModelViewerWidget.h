@@ -39,6 +39,9 @@ protected:
 
     void resizeEvent(QResizeEvent* event);
 
+private slots:
+    void onInertiaTimeout();
+
 private:
 	void updateCamera();
     void resetView();
@@ -65,7 +68,7 @@ private:
     bool _sceneUpdated;
 
     // Interaction modes
-    enum class InteractionMode { None, Rotate, Pan };
+    enum class InteractionMode { None, Zoom, Rotate, Pan };
 
     QPoint m_lastMousePos;
     float m_rotationX = 0.0f, m_rotationY = 0.0f;
@@ -78,5 +81,12 @@ private:
 	ViewProjection m_viewProjection = ViewProjection::Custom;
 
     QWidget* _viewToolbar;
+
+    float m_azimuthSpeed = 0.f;
+    float m_elevationSpeed = 0.f;
+    bool m_isDragging = false;
+    QPointF m_panSpeed = { 0, 0 };
+    float m_zoomSpeed = 0.f;
+    QTimer* m_inertiaTimer = nullptr;
 
 };

@@ -7,6 +7,7 @@
 #include <QHBoxLayout>
 #include <QPushButton>
 #include <QToolButton>
+#include <QTimer>
 #include <assimp/postprocess.h>
 #include <cfloat>
 
@@ -33,12 +34,14 @@ ModelViewerWidget::ModelViewerWidget(QWidget *parent)
 	m_zoom = 1.0f;  
     float m_azimuth = 0.0f;     // Horizontal angle in degrees
     float m_elevation = 20.0f;  // Vertical angle in degrees
+    m_inertiaTimer = new QTimer(this);
+    m_inertiaTimer->setInterval(16); // ~60 FPS
+    connect(m_inertiaTimer, &QTimer::timeout, this, &ModelViewerWidget::onInertiaTimeout);
 
     _viewToolbar = new QWidget(this);
     _viewToolbar->setAttribute(Qt::WA_TransparentForMouseEvents, false);
     _viewToolbar->setStyleSheet("background: rgba(255, 255, 255, 100); border: 1px solid gray; border-radius: 4px;");
-    _viewToolbar->setFixedHeight(64);
-    
+    _viewToolbar->setFixedHeight(64);    
 
     QHBoxLayout* layout = new QHBoxLayout(_viewToolbar);
     layout->setContentsMargins(4, 4, 4, 4);
@@ -50,8 +53,6 @@ ModelViewerWidget::ModelViewerWidget(QWidget *parent)
     layout->addWidget(createViewButton(":/icons/res/isometric.png", "Isometric View", [this]() { setViewAxonometric(); }, _viewToolbar));
     layout->addWidget(createViewButton(":/icons/res/fit-all.png", "Fit All", [this]() { fitToView(); }, _viewToolbar));
     
-    qDebug() << QIcon(":/icons/res/top.png").isNull();
-
     setFocusPolicy(Qt::StrongFocus);
 }
 
@@ -250,12 +251,25 @@ void ModelViewerWidget::drawNode(aiNode *node) {
 
 void ModelViewerWidget::mousePressEvent(QMouseEvent* event)
 {
+    m_isDragging = true;
+    if (m_inertiaTimer->isActive())
+        m_inertiaTimer->stop();
+
+    m_azimuthSpeed = 0.f;
+    m_elevationSpeed = 0.f;
+    m_panSpeed = { 0, 0 };
+    m_zoomSpeed = 0.f;
+
     m_lastMousePos = event->pos();
 
     if (event->button() == Qt::LeftButton)
         m_mode = InteractionMode::Rotate;
     else if (event->button() == Qt::RightButton)
         m_mode = InteractionMode::Pan;
+	else if (event->button() == Qt::MiddleButton)
+        m_mode = InteractionMode::Zoom;
+    else
+        m_mode = InteractionMode::None;    
 }
 
 
@@ -267,7 +281,10 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
     if (m_mode == InteractionMode::Rotate) {
         m_azimuth -= delta.x() * 0.5f;
         m_elevation += delta.y() * 0.5f;
-        //m_elevation = std::clamp(m_elevation, -89.0f, 89.0f);
+        
+        // Save speeds for inertia
+        m_azimuthSpeed = -delta.x() * 0.5f;
+        m_elevationSpeed = delta.y() * 0.5f;
     }
     else if (m_mode == InteractionMode::Pan) {
         float radAzim = qDegreesToRadians(m_azimuth);
@@ -288,6 +305,16 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
         // Apply panning to the view center
         _viewCenter -= right * (delta.x() * panSpeed);
         _viewCenter += up * (delta.y() * panSpeed);
+
+        // Save pan speed
+        m_panSpeed = QPointF(delta.x() * panSpeed, delta.y() * panSpeed);
+    }
+    else if (m_mode == InteractionMode::Zoom) {
+        float zoomDelta = delta.y() * 0.01f;
+        m_zoom *= std::exp(-zoomDelta);
+        m_zoom = std::clamp(m_zoom, 0.01f, 10.0f);
+
+        m_zoomSpeed = -zoomDelta;
     }
 
     update();
@@ -295,6 +322,10 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
 
 void ModelViewerWidget::mouseReleaseEvent(QMouseEvent* event)
 {
+    m_isDragging = false;
+    if (!m_inertiaTimer->isActive())
+        m_inertiaTimer->start();
+
     Q_UNUSED(event);
     m_mode = InteractionMode::None;
 }
@@ -303,7 +334,10 @@ void ModelViewerWidget::wheelEvent(QWheelEvent* event)
 {
     QPoint numDegrees = event->angleDelta() / 8;
     if (!numDegrees.isNull()) {
-        m_zoom *= 1.0f + numDegrees.y() / 240.0f;
+        m_zoomSpeed += numDegrees.y() / 800.0f;
+
+        if (!m_inertiaTimer->isActive())
+            m_inertiaTimer->start();
     }
     update();
 }
@@ -417,5 +451,55 @@ void ModelViewerWidget::setViewAxonometric() {
 void ModelViewerWidget::fitToView() {
     // Optional: adjust _cameraDistance or zoom to fit model bounds
 	updateCamera();
+    update();
+}
+
+void ModelViewerWidget::onInertiaTimeout()
+{
+    if (m_isDragging) return;
+
+    constexpr float damping = 0.90f;
+
+    // Rotation inertia
+    m_azimuth += m_azimuthSpeed;
+    m_elevation += m_elevationSpeed;
+    m_azimuthSpeed *= damping;
+    m_elevationSpeed *= damping;
+    
+    // Pan inertia
+    if (!m_panSpeed.isNull()) {
+        float radAzim = qDegreesToRadians(m_azimuth);
+        aiVector3D right(std::cos(radAzim), 0, -std::sin(radAzim));
+        aiVector3D up(0, 1, 0);
+        right.Normalize();
+        up.Normalize();
+
+        _viewCenter -= right * static_cast<float>(m_panSpeed.x());
+        _viewCenter += up * static_cast<float>(m_panSpeed.y());
+
+        m_panSpeed *= damping;
+        if (std::abs(m_panSpeed.x()) < 1e-5f && std::abs(m_panSpeed.y()) < 1e-5f)
+            m_panSpeed = { 0, 0 };
+    }
+
+    // Zoom inertia
+    if (std::abs(m_zoomSpeed) > 1e-5f) {
+        m_zoom *= std::exp(m_zoomSpeed);
+        m_zoom = std::clamp(m_zoom, 0.01f, 10.0f);
+        m_zoomSpeed *= damping;
+
+        if (std::abs(m_zoomSpeed) < 1e-5f)
+            m_zoomSpeed = 0.f;
+    }
+
+    // Stop if everything has slowed
+    if (std::abs(m_azimuthSpeed) < 0.01f &&
+        std::abs(m_elevationSpeed) < 0.01f &&
+        m_panSpeed.isNull() &&
+        std::abs(m_zoomSpeed) < 1e-5f)
+    {
+        m_inertiaTimer->stop();
+    }
+
     update();
 }
