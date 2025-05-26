@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include <QApplication>
 #include <QSplitter>
 #include <QVBoxLayout>
 #include <QFileDialog>
@@ -10,6 +11,7 @@
 #include <assimp/postprocess.h>
 #include <QMetaObject>
 #include <QtConcurrent>
+#include <QMessageBox>
 
 #include "QtAssimpProgressHandler.h"
 
@@ -64,13 +66,24 @@ MainWindow::MainWindow(QWidget* parent)
 
 	QMenu* fileMenu = menuBar()->addMenu("File");
 	QAction* openAct = fileMenu->addAction("Open");
+	openAct->setShortcut(QKeySequence::Open);
 	connect(openAct, &QAction::triggered, [this]() {
 		QString filePath = QFileDialog::getOpenFileName(this, "Open Model", "", "Model Files (*.obj *.fbx *.dae *.3ds *.stl *.ply *.gltf)");
 		if (!filePath.isEmpty()) loadModel(filePath);
 		});
 
 	QAction* exitAct = fileMenu->addAction("Exit");
+	exitAct->setShortcut(QKeySequence::Quit);
 	connect(exitAct, &QAction::triggered, this, &QWidget::close);
+
+	QMenu* helpMenu = menuBar()->addMenu("Help");
+	QAction* aboutAct = helpMenu->addAction("About");
+	connect(aboutAct, &QAction::triggered, this, [this]() {
+		QMessageBox::about(this, "About Model Viewer", "This is a simple model viewer using Qt and Assimp.");
+		});
+
+	QAction* aboutQtAct = helpMenu->addAction("About Qt");
+	connect(aboutQtAct, &QAction::triggered, this, &QApplication::aboutQt);
 
 	connect(m_searchBox, &QLineEdit::textChanged, this, &MainWindow::filterTree);
 	connect(m_viewerWidget, &ModelViewerWidget::nodePicked,
