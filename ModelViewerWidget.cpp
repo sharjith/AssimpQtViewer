@@ -183,9 +183,7 @@ void ModelViewerWidget::paintGL() {
         _viewCenter.x, _viewCenter.y, _viewCenter.z,              // target
         up.x, up.y, up.z                                          // up vector
     );
-
-    //glTranslatef(-_viewCenter.x, -_viewCenter.y, -_viewCenter.z);
-
+        
     if (!scene) {
         // draw test triangle
         glBegin(GL_TRIANGLES);
@@ -200,31 +198,83 @@ void ModelViewerWidget::paintGL() {
         drawNode(scene->mRootNode);
 }
 
+#include <QFile>
+#include <QFileInfo>
+#include <QDir>
 void ModelViewerWidget::loadModel(const QString &filePath) {
+    
+	QFileInfo fileInfo(filePath);
+	m_lastModelPath = fileInfo.absolutePath();
 	resetView();
+    for (auto texId : m_materialTextureCache) {
+        if (texId.second) glDeleteTextures(1, &texId.second);
+    }
+    m_materialTextureCache.clear();
     scene = importer.ReadFile(filePath.toStdString(), aiProcess_Triangulate | aiProcess_GenNormals);
     updateCamera();
     update();
 }
+
+
+GLuint ModelViewerWidget::loadTextureIfNeeded(const aiMaterial* material, unsigned int materialIndex)
+{
+    if (m_materialTextureCache.find(materialIndex) != m_materialTextureCache.end())
+        return m_materialTextureCache[materialIndex];
+
+    if (material->GetTextureCount(aiTextureType_DIFFUSE) > 0) {
+        aiString texturePath;
+        if (material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath) == AI_SUCCESS) {
+            QString fullPath = QDir(m_lastModelPath).filePath(QString::fromUtf8(texturePath.C_Str()));
+            QImage image(fullPath);
+            if (!image.isNull()) {
+                image = image.convertToFormat(QImage::Format_RGBA8888).mirrored(false, true);
+                GLuint texId;
+                glGenTextures(1, &texId);
+                glBindTexture(GL_TEXTURE_2D, texId);
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width(), image.height(), 0,
+                    GL_RGBA, GL_UNSIGNED_BYTE, image.bits());
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+                glGenerateMipmap(GL_TEXTURE_2D);
+                m_materialTextureCache[materialIndex] = texId;
+                return texId;
+            }
+        }
+    }
+
+    m_materialTextureCache[materialIndex] = 0; // No texture
+    return 0;
+}
+
 
 void ModelViewerWidget::highlightNode(aiNode *node) {
     highlightedNode = node;
     update();
 }
 
-void ModelViewerWidget::drawNode(aiNode *node) {
+void ModelViewerWidget::drawNode(aiNode* node)
+{
     for (unsigned i = 0; i < node->mNumMeshes; ++i) {
-        const aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
+        const aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
         if (!mesh) continue;
 
         const aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+        GLuint texId = loadTextureIfNeeded(material, mesh->mMaterialIndex);
+
+        if (texId) {
+            glEnable(GL_TEXTURE_2D);
+            glBindTexture(GL_TEXTURE_2D, texId);
+        }
+        else {
+            glDisable(GL_TEXTURE_2D);
+        }
 
         aiColor4D diffuse;
         if (AI_SUCCESS == aiGetMaterialColor(material, AI_MATKEY_COLOR_DIFFUSE, &diffuse)) {
             glColor4f(diffuse.r, diffuse.g, diffuse.b, diffuse.a);
         }
         else {
-            glColor4f(0.8f, 0.8f, 0.8f, 1.0f); // default gray
+            glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
         }
 
         glBegin(GL_TRIANGLES);
@@ -236,18 +286,56 @@ void ModelViewerWidget::drawNode(aiNode *node) {
                     const aiVector3D& n = mesh->mNormals[index];
                     glNormal3f(n.x, n.y, n.z);
                 }
+                if (mesh->HasTextureCoords(0)) {
+                    const aiVector3D& uv = mesh->mTextureCoords[0][index];
+                    glTexCoord2f(uv.x, uv.y);
+                }
+
+                if (node == highlightedNode && !texId)
+                    glColor3d(204, 255, 0); // Flourescent Yellow highlight
+
                 const aiVector3D& v = mesh->mVertices[index];
-                if (node == highlightedNode)
-                    glColor3f(1, 1, 0); // highlight                
                 glVertex3f(v.x, v.y, v.z);
             }
         }
-        glEnd();
+        glEnd();       
+		glDisable(GL_TEXTURE_2D);
+
+        // Optional second pass: wireframe highlight
+        if (node == highlightedNode && texId) {
+            glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_LINE_BIT);
+
+            glDisable(GL_LIGHTING);
+            glDisable(GL_TEXTURE_2D);
+            glEnable(GL_POLYGON_OFFSET_LINE);
+            glPolygonOffset(-1.0f, -1.0f); // Pull forward to avoid z-fighting
+
+            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            glLineWidth(0.50f);
+            glColor3d(204, 255, 0); // Flourescent Yellow highlight
+
+            glBegin(GL_TRIANGLES);
+            for (unsigned int j = 0; j < mesh->mNumFaces; ++j) {
+                const aiFace& face = mesh->mFaces[j];
+                for (unsigned int k = 0; k < face.mNumIndices; ++k) {
+                    unsigned int index = face.mIndices[k];
+                    const aiVector3D& v = mesh->mVertices[index];
+                    glVertex3f(v.x, v.y, v.z);
+                }
+            }
+            glEnd();
+
+            glPopAttrib();
+        }
+
+        if (texId)
+            glBindTexture(GL_TEXTURE_2D, 0);
     }
 
     for (unsigned i = 0; i < node->mNumChildren; ++i)
         drawNode(node->mChildren[i]);
 }
+
 
 void ModelViewerWidget::mousePressEvent(QMouseEvent* event)
 {
@@ -592,6 +680,9 @@ void ModelViewerWidget::pickRay(const aiVector3D& origin, const aiVector3D& dir)
         }
 		highlightNode(m_lastPickedNode);
     }
+    else {
+        highlightNode(nullptr);
+    }
 }
 
 
@@ -640,4 +731,5 @@ aiNode* ModelViewerWidget::findNodeForMesh(aiNode* node, int meshIndex) {
 
     return nullptr;
 }
+
 

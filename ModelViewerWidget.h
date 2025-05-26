@@ -19,7 +19,7 @@ class ModelViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions {
     Q_OBJECT
 public:
     explicit ModelViewerWidget(QWidget *parent = nullptr);
-    void loadModel(const QString &filePath);
+    void loadModel(const QString &filePath);    
     const aiScene* getScene() const { return scene; }
     void highlightNode(aiNode *node);
 	Assimp::Importer* getImporter() { return &importer; }
@@ -46,7 +46,8 @@ signals:
 private slots:
     void onInertiaTimeout();
 
-private:
+private:    
+    GLuint loadTextureIfNeeded(const aiMaterial* material, unsigned int materialIndex);
 	void updateCamera();
     void resetView();
     void setViewProjection(ViewProjection view);
@@ -63,7 +64,7 @@ private:
         float& outT
     );
     aiNode* findNodeForMesh(aiNode* node, int meshIndex);
-
+    
     QToolButton* createViewButton(const QString& iconPath, const QString& tooltip, const std::function<void()>& callback, QWidget* parent = nullptr);
 
 private:
@@ -102,5 +103,7 @@ private:
     float m_zoomSpeed = 0.f;
     QTimer* m_inertiaTimer = nullptr;
 	aiNode* m_lastPickedNode = nullptr;
-
+        
+    std::unordered_map<unsigned int, GLuint> m_materialTextureCache;
+	QString m_lastModelPath;
 };
