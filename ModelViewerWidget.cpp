@@ -227,7 +227,7 @@ GLuint ModelViewerWidget::loadTextureIfNeeded(const aiMaterial* material, unsign
             QString fullPath = QDir(m_lastModelPath).filePath(QString::fromUtf8(texturePath.C_Str()));
             QImage image(fullPath);
             if (!image.isNull()) {
-                image = image.convertToFormat(QImage::Format_RGBA8888).flipped();
+                image = image.convertToFormat(QImage::Format_RGBA8888).mirrored();
                 GLuint texId;
                 glGenTextures(1, &texId);
                 glBindTexture(GL_TEXTURE_2D, texId);
