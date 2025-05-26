@@ -20,9 +20,9 @@ class ModelViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions {
 public:
     explicit ModelViewerWidget(QWidget *parent = nullptr);
     void loadModel(const QString &filePath);    
-    const aiScene* getScene() const { return scene; }
+    const aiScene* getScene() const { return m_scene; }
     void highlightNode(aiNode *node);
-	Assimp::Importer* getImporter() { return &importer; }
+	Assimp::Importer* getImporter() { return &m_importer; }
 protected:
     void initializeGL() override;
     void resizeGL(int w, int h) override;
@@ -37,7 +37,7 @@ protected:
 	void focusInEvent(QFocusEvent* event) override;
 	void focusOutEvent(QFocusEvent* event) override;*/
 
-    void resizeEvent(QResizeEvent* event);
+    void resizeEvent(QResizeEvent* event) override;
 
 
 signals:
@@ -46,7 +46,8 @@ signals:
 private slots:
     void onInertiaTimeout();
 
-private:    
+private:   
+    void drawNode(aiNode* node);
     GLuint loadTextureIfNeeded(const aiMaterial* material, unsigned int materialIndex);
 	void updateCamera();
     void resetView();
@@ -68,18 +69,17 @@ private:
     QToolButton* createViewButton(const QString& iconPath, const QString& tooltip, const std::function<void()>& callback, QWidget* parent = nullptr);
 
 private:
-    const aiScene *scene = nullptr;
-    aiNode *highlightedNode = nullptr;
-    Assimp::Importer importer;
-    void drawNode(aiNode *node);
+    const aiScene* m_scene = nullptr;
+    aiNode* m_highlightedNode = nullptr;
+    Assimp::Importer m_importer;    
 
-    aiVector3D _cameraPos;   // Current camera position
-    aiVector3D _viewCenter;  // Model center point
-    aiVector3D _upVector;    // Up direction for the camera (usually (0,1,0))
+    aiVector3D m_cameraPos;   // Current camera position
+    aiVector3D m_viewCenter;  // Model center point
+    aiVector3D m_upVector;    // Up direction for the camera (usually (0,1,0))
     
-    float _viewRadius;
-    float _cameraDistance;
-    bool _sceneUpdated;
+    float m_viewRadius;
+    float m_cameraDistance;
+    bool m_sceneUpdated;
 
     // Interaction modes
     enum class InteractionMode { Select, Zoom, Rotate, Pan };

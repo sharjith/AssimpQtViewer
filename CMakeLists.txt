@@ -32,7 +32,7 @@ set(HEADERS
 	MainWindow.h
     ModelViewerWidget.h    
     HighlightDelegate.h
-    QtAssimpProgressHandler.h
+    "AssimpProgressHandler.h"
 )
 
 # Main executable

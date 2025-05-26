@@ -14,12 +14,13 @@ public:
 private slots:
     void onTreeItemClicked(QTreeWidgetItem* item, int column);
     void filterTree(const QString& text);
-
+    void showFileReadingProgress(float percent);
 private:
     void selectTreeNodeFor(aiNode* node); // ← this will highlight the item
-    void loadModel(const QString& path);
+    void loadModel(const QString& path);    
+    void setProgressValue(const int& value);
     void populateTree(const aiScene* scene);
-
+    
 private:
     ModelViewerWidget* m_viewerWidget;
     QTreeWidget* m_treeWidget;

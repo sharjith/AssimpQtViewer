@@ -13,7 +13,7 @@
 #include <QtConcurrent>
 #include <QMessageBox>
 
-#include "QtAssimpProgressHandler.h"
+#include "AssimpProgressHandler.h"
 
 MainWindow::MainWindow(QWidget* parent)
 	: QMainWindow(parent), m_viewerWidget(new ModelViewerWidget(this)), m_treeWidget(new QTreeWidget(this)) {
@@ -48,6 +48,8 @@ MainWindow::MainWindow(QWidget* parent)
 	m_progressBar->setTextVisible(false);
 	m_progressBar->setRange(0, 100);  // Default range
 	m_progressBar->setValue(0);  // Default value
+	m_progressBar->setVisible(false);  // Default value
+
 	// Minimal styling
 	m_progressBar->setStyleSheet(R"(
     QProgressBar { border: 0; background-color: transparent; }
@@ -95,16 +97,14 @@ void MainWindow::loadModel(const QString& path) {
 	m_progressBar->setValue(0);
 	m_progressBar->setRange(0, 100);
 	m_progressBar->setVisible(true);
+	update();
 
-	auto* handler = new QtAssimpProgressHandler(this);
+	auto* handler = new AssimpProgressHandler();
 	m_viewerWidget->getImporter()->SetProgressHandler(handler);
 
-	connect(handler, &QtAssimpProgressHandler::progressChanged, this, [this](int percent) {
-		m_progressBar->setValue(percent);
-		});
+	connect(handler, &AssimpProgressHandler::progressChanged, this, &MainWindow::showFileReadingProgress);
 
-	m_progressBar->setVisible(false);
-
+	
 	m_treeWidget->clear();
 	m_viewerWidget->loadModel(path);
 
@@ -117,6 +117,35 @@ void MainWindow::loadModel(const QString& path) {
 	
 	m_progressBar->setValue(100);
 	m_progressBar->setVisible(false);
+
+	disconnect(handler, SIGNAL(progressChanged(float)), this, SLOT(showFileReadingProgress(float)));
+	//delete _progHandler; // causes crash
+	handler = nullptr;
+}
+
+void MainWindow::showFileReadingProgress(float percent)
+{
+	MainWindow::setProgressValue((int)((float)percent * 100.0f));	
+}
+
+void MainWindow::setProgressValue(const int& value)
+{
+	if (value == 0)
+	{
+		m_progressBar->reset();
+#if defined _WIN32 && QT_VERSION_MAJOR == 5
+		_mainWindow->_windowsTaskbarProgress->reset();
+#endif 
+	}
+	else
+	{
+		m_progressBar->setValue(value);
+#if defined _WIN32 && QT_VERSION_MAJOR == 5
+		_mainWindow->_windowsTaskbarProgress->setValue(value);
+#endif 
+	}
+	m_progressBar->update();
+	qApp->processEvents();
 }
 
 

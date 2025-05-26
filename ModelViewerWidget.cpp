@@ -28,9 +28,9 @@ ModelViewerWidget::ModelViewerWidget(QWidget *parent)
     fmt.setProfile(QSurfaceFormat::CompatibilityProfile);
     QSurfaceFormat::setDefaultFormat(fmt);
 
-    _viewRadius = 1000;
-	_cameraDistance = 500;
-    _sceneUpdated = false;
+    m_viewRadius = 1000;
+	m_cameraDistance = 500;
+    m_sceneUpdated = false;
 	m_zoom = 1.0f;  
     float m_azimuth = 0.0f;     // Horizontal angle in degrees
     float m_elevation = 20.0f;  // Vertical angle in degrees
@@ -89,7 +89,7 @@ void ModelViewerWidget::initializeGL() {
     glLightfv(GL_LIGHT0, GL_SPECULAR, lightColor);
 
     float fovYRadians = 45.0f * M_PI / 180.0f;
-    _cameraDistance = _viewRadius / std::tan(fovYRadians * 0.5f);
+    m_cameraDistance = m_viewRadius / std::tan(fovYRadians * 0.5f);
 }
 
 void ModelViewerWidget::resizeGL(int w, int h) {
@@ -97,8 +97,8 @@ void ModelViewerWidget::resizeGL(int w, int h) {
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
 
-    float nearPlane = _viewRadius * 0.1f;
-    float farPlane = _viewRadius * 10.0f;
+    float nearPlane = m_viewRadius * 0.1f;
+    float farPlane = m_viewRadius * 10.0f;
     gluPerspective(45.0, float(w)/h, nearPlane, farPlane);
     glMatrixMode(GL_MODELVIEW);
 }
@@ -132,7 +132,7 @@ void computeBoundingBox(const aiScene* scene, const aiNode* node,
 
 void ModelViewerWidget::updateCamera() {
 	// Update camera position based on the current rotation and zoom
-    if (!scene) {        
+    if (!m_scene) {        
         return;
     }
     // After computing bounding box:
@@ -140,20 +140,20 @@ void ModelViewerWidget::updateCamera() {
     aiVector3D maximum(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
     aiMatrix4x4 identity;
-    computeBoundingBox(scene, scene->mRootNode, minimum, maximum, identity);
+    computeBoundingBox(m_scene, m_scene->mRootNode, minimum, maximum, identity);
     float maxExtent = std::max({ maximum.x - minimum.x, maximum.y - minimum.y, maximum.z - minimum.z });
-	_viewCenter = (maximum + minimum) * 0.5f;
-    _viewRadius = maxExtent * 0.5f;
+	m_viewCenter = (maximum + minimum) * 0.5f;
+    m_viewRadius = maxExtent * 0.5f;
 
     // Ideal distance from camera to model center based on FOV
     float fovYRadians = 45.0f * M_PI / 180.0f;
-    _cameraDistance = _viewRadius / std::tan(fovYRadians * 0.5f);
+    m_cameraDistance = m_viewRadius / std::tan(fovYRadians * 0.5f);
 
     // Set default camera position: looking from +Z axis
-    _cameraPos = aiVector3D(_viewCenter.x, _viewCenter.y, _viewCenter.z + _cameraDistance);
-    _upVector = aiVector3D(0, 1, 0);
+    m_cameraPos = aiVector3D(m_viewCenter.x, m_viewCenter.y, m_viewCenter.z + m_cameraDistance);
+    m_upVector = aiVector3D(0, 1, 0);
 
-    _sceneUpdated = true;
+    m_sceneUpdated = true;
     m_zoom = 1.0f;
 }
 
@@ -163,8 +163,8 @@ void ModelViewerWidget::paintGL() {
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    float nearPlane = _viewRadius * 0.1f;
-    float farPlane = _viewRadius * 10.0f;
+    float nearPlane = m_viewRadius * 0.1f;
+    float farPlane = m_viewRadius * 10.0f;
     gluPerspective(45.0, float(width()) / height(), nearPlane, farPlane);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
@@ -172,19 +172,19 @@ void ModelViewerWidget::paintGL() {
     // Convert spherical coordinates to Cartesian
     float radAzim = qDegreesToRadians(m_azimuth);
     float radElev = qDegreesToRadians(m_elevation);
-    float x = _cameraDistance * m_zoom * std::cos(radElev) * std::sin(radAzim);
-    float y = _cameraDistance * m_zoom * std::sin(radElev);
-    float z = _cameraDistance * m_zoom * std::cos(radElev) * std::cos(radAzim);
+    float x = m_cameraDistance * m_zoom * std::cos(radElev) * std::sin(radAzim);
+    float y = m_cameraDistance * m_zoom * std::sin(radElev);
+    float z = m_cameraDistance * m_zoom * std::cos(radElev) * std::cos(radAzim);
 
     aiVector3D up = (std::cos(radElev) >= 0) ? aiVector3D(0, 1, 0) : aiVector3D(0, -1, 0);
 
     gluLookAt(
-        x + _viewCenter.x, y + _viewCenter.y, z + _viewCenter.z,  // camera position
-        _viewCenter.x, _viewCenter.y, _viewCenter.z,              // target
+        x + m_viewCenter.x, y + m_viewCenter.y, z + m_viewCenter.z,  // camera position
+        m_viewCenter.x, m_viewCenter.y, m_viewCenter.z,              // target
         up.x, up.y, up.z                                          // up vector
     );
         
-    if (!scene) {
+    if (!m_scene) {
         // draw test triangle
         glBegin(GL_TRIANGLES);
         glColor3f(1, 0, 0); glVertex3f(0, 1, 0);
@@ -194,8 +194,8 @@ void ModelViewerWidget::paintGL() {
         return;
     }
 
-    if (scene->mRootNode)
-        drawNode(scene->mRootNode);
+    if (m_scene->mRootNode)
+        drawNode(m_scene->mRootNode);
 }
 
 #include <QFile>
@@ -203,6 +203,11 @@ void ModelViewerWidget::paintGL() {
 #include <QDir>
 void ModelViewerWidget::loadModel(const QString &filePath) {
     
+    if (m_scene)
+    {
+		m_importer.FreeScene();
+        m_scene = nullptr;
+    }
 	QFileInfo fileInfo(filePath);
 	m_lastModelPath = fileInfo.absolutePath();
 	resetView();
@@ -210,16 +215,16 @@ void ModelViewerWidget::loadModel(const QString &filePath) {
         if (texId.second) glDeleteTextures(1, &texId.second);
     }
     m_materialTextureCache.clear();
-    scene = importer.ReadFile(filePath.toStdString(), 
+    m_scene = m_importer.ReadFile(filePath.toStdString(), 
         aiProcess_Triangulate | aiProcess_ValidateDataStructure | 
         aiProcess_CalcTangentSpace | aiProcess_GenSmoothNormals |
         aiProcess_FixInfacingNormals | aiProcess_JoinIdenticalVertices |
         aiProcess_OptimizeMeshes | aiProcess_GenUVCoords | aiProcess_SortByPType);
 
-    if (!scene || scene->mFlags == AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
+    if (!m_scene || m_scene->mFlags == AI_SCENE_FLAGS_INCOMPLETE || !m_scene->mRootNode) // if is Not Zero
     {        
-        qDebug() << "ERROR::ASSIMP:: " << importer.GetErrorString();
-		scene = nullptr;
+        qDebug() << "ERROR::ASSIMP:: " << m_importer.GetErrorString();
+		m_scene = nullptr;
         return;
     }
 
@@ -260,17 +265,17 @@ GLuint ModelViewerWidget::loadTextureIfNeeded(const aiMaterial* material, unsign
 
 
 void ModelViewerWidget::highlightNode(aiNode *node) {
-    highlightedNode = node;
+    m_highlightedNode = node;
     update();
 }
 
 void ModelViewerWidget::drawNode(aiNode* node)
 {
     for (unsigned i = 0; i < node->mNumMeshes; ++i) {
-        const aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
+        const aiMesh* mesh = m_scene->mMeshes[node->mMeshes[i]];
         if (!mesh) continue;
 
-        const aiMaterial* material = scene->mMaterials[mesh->mMaterialIndex];
+        const aiMaterial* material = m_scene->mMaterials[mesh->mMaterialIndex];
         GLuint texId = loadTextureIfNeeded(material, mesh->mMaterialIndex);
 
         if (texId) {
@@ -303,7 +308,7 @@ void ModelViewerWidget::drawNode(aiNode* node)
                     glTexCoord2f(uv.x, uv.y);
                 }
 
-                if (node == highlightedNode && !texId)
+                if (node == m_highlightedNode && !texId)
                     glColor3d(204, 255, 0); // Flourescent Yellow highlight
 
                 const aiVector3D& v = mesh->mVertices[index];
@@ -314,7 +319,7 @@ void ModelViewerWidget::drawNode(aiNode* node)
 		glDisable(GL_TEXTURE_2D);
 
         // Optional second pass: wireframe highlight
-        if (node == highlightedNode && texId) {
+        if (node == m_highlightedNode && texId) {
             glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_LINE_BIT);
 
             glDisable(GL_LIGHTING);
@@ -407,11 +412,11 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
         up.Normalize();
 
         // Pan speed scaled by distance
-        float panSpeed = _cameraDistance * 0.001f;
+        float panSpeed = m_cameraDistance * 0.001f;
 
         // Apply panning to the view center
-        _viewCenter -= right * (delta.x() * panSpeed);
-        _viewCenter += up * (delta.y() * panSpeed);
+        m_viewCenter -= right * (delta.x() * panSpeed);
+        m_viewCenter += up * (delta.y() * panSpeed);
 
         // Save pan speed
         m_panSpeed = QPointF(delta.x() * panSpeed, delta.y() * panSpeed);
@@ -496,9 +501,9 @@ void ModelViewerWidget::resetView() {
     m_panX = 0.0f;
     m_panY = 0.0f;
     m_zoom = 1.0f;
-    _cameraDistance = 0.0f;
-    _viewCenter = aiVector3D(0, 0, 0);
-    _viewRadius = 1.0f;
+    m_cameraDistance = 0.0f;
+    m_viewCenter = aiVector3D(0, 0, 0);
+    m_viewRadius = 1.0f;
 }
 
 void ModelViewerWidget::setViewProjection(ViewProjection view)
@@ -581,8 +586,8 @@ void ModelViewerWidget::onInertiaTimeout()
         right.Normalize();
         up.Normalize();
 
-        _viewCenter -= right * static_cast<float>(m_panSpeed.x());
-        _viewCenter += up * static_cast<float>(m_panSpeed.y());
+        m_viewCenter -= right * static_cast<float>(m_panSpeed.x());
+        m_viewCenter += up * static_cast<float>(m_panSpeed.y());
 
         m_panSpeed *= damping;
         if (std::abs(m_panSpeed.x()) < 1e-5f && std::abs(m_panSpeed.y()) < 1e-5f)
@@ -649,7 +654,7 @@ void ModelViewerWidget::pickRay(const aiVector3D& origin, const aiVector3D& dir)
 
         for (unsigned i = 0; i < node->mNumMeshes; ++i) {
             const int meshIndex = node->mMeshes[i];
-            const aiMesh* mesh = scene->mMeshes[meshIndex];
+            const aiMesh* mesh = m_scene->mMeshes[meshIndex];
 
             for (unsigned f = 0; f < mesh->mNumFaces; ++f) {
                 const aiFace& face = mesh->mFaces[f];
@@ -678,10 +683,10 @@ void ModelViewerWidget::pickRay(const aiVector3D& origin, const aiVector3D& dir)
             traverse(node->mChildren[i], transform);
         };
 
-    traverse(scene->mRootNode, aiMatrix4x4());
+    traverse(m_scene->mRootNode, aiMatrix4x4());
 
     if (hitMeshIndex != -1) {
-        aiNode* hitNode = findNodeForMesh(scene->mRootNode, hitMeshIndex);
+        aiNode* hitNode = findNodeForMesh(m_scene->mRootNode, hitMeshIndex);
         if (m_lastPickedNode == hitNode) {
             emit nodePicked(nullptr); // Signal to deselect
             m_lastPickedNode = nullptr;
