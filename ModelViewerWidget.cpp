@@ -210,7 +210,19 @@ void ModelViewerWidget::loadModel(const QString &filePath) {
         if (texId.second) glDeleteTextures(1, &texId.second);
     }
     m_materialTextureCache.clear();
-    scene = importer.ReadFile(filePath.toStdString(), aiProcess_Triangulate | aiProcess_GenNormals);
+    scene = importer.ReadFile(filePath.toStdString(), 
+        aiProcess_Triangulate | aiProcess_ValidateDataStructure | 
+        aiProcess_CalcTangentSpace | aiProcess_GenSmoothNormals |
+        aiProcess_FixInfacingNormals | aiProcess_JoinIdenticalVertices |
+        aiProcess_OptimizeMeshes | aiProcess_GenUVCoords | aiProcess_SortByPType);
+
+    if (!scene || scene->mFlags == AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) // if is Not Zero
+    {        
+        qDebug() << "ERROR::ASSIMP:: " << importer.GetErrorString();
+		scene = nullptr;
+        return;
+    }
+
     updateCamera();
     update();
 }
