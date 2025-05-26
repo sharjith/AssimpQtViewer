@@ -12,52 +12,62 @@ void HighlightDelegate::setPattern(const QString& pattern) {
 }
 
 void HighlightDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,
-    const QModelIndex& index) const {
+                              const QModelIndex& index) const {
     painter->save();
 
+    // 1. Draw the base item using the default style (preserves selection background)
+    QStyleOptionViewItem opt = option;
+    initStyleOption(&opt, index);
+    QStyledItemDelegate::paint(painter, opt, index);
+
+    // 2. Check if we need to highlight any search pattern
     QString text = index.data(Qt::DisplayRole).toString();
+    if (m_pattern.isEmpty())
+    {
+        painter->restore();
+        return;  // No search pattern: no custom highlighting
+    }
+
     QString lowerText = text.toLower();
     QString lowerPattern = m_pattern.toLower();
 
-    QRect rect = option.rect;
-    painter->setClipRect(rect);
-
-    QFont font = option.font;
-    painter->setFont(font);
-    painter->setPen(option.palette.text().color());
-
     int matchStart = lowerText.indexOf(lowerPattern);
-    if (matchStart < 0 || lowerPattern.isEmpty()) {
-        // No match: draw whole text normally
-        painter->drawText(rect, Qt::AlignVCenter | Qt::AlignLeft, text);
+    if (matchStart < 0) {
+        painter->restore();
+        return;  // No match: nothing to highlight
     }
-    else {
-        QString before = text.left(matchStart);
-        QString match = text.mid(matchStart, m_pattern.length());
-        QString after = text.mid(matchStart + m_pattern.length());
 
-        int x = rect.left();
-        int y = rect.top() + (rect.height() + option.fontMetrics.ascent() - option.fontMetrics.descent()) / 2;
+    // 3. Perform manual drawing over the text to highlight the match
+    QRect textRect = option.rect;
+    painter->setClipRect(textRect);
 
-        // Draw 'before' part
-        painter->drawText(x, y, before);
-        x += option.fontMetrics.horizontalAdvance(before);
+    QFontMetrics fm(option.font);
+    QString before = text.left(matchStart);
+    QString match = text.mid(matchStart, m_pattern.length());
+    QString after = text.mid(matchStart + m_pattern.length());
 
-        // Draw background for matched text
-        int matchWidth = option.fontMetrics.horizontalAdvance(match);
-        QRect matchRect(x, rect.top(), matchWidth, rect.height());
-        painter->fillRect(matchRect, QColor(255, 220, 220));  // light red background
+    int x = textRect.left() + 4;  // Small left margin
+    int y = textRect.top() + (textRect.height() + fm.ascent() - fm.descent()) / 2;
 
-        // Draw matched text
-        painter->setPen(Qt::black);  // darker text for contrast
-        painter->drawText(x, y, match);
-        x += matchWidth;
+    // Measure width of each part
+    int beforeWidth = fm.horizontalAdvance(before);
+    int matchWidth = fm.horizontalAdvance(match);
 
-        // Draw 'after' part
-        painter->setPen(option.palette.text().color());
-        painter->drawText(x, y, after);
-    }
+    // Highlight background for matched text
+    QRect matchRect(x + beforeWidth, textRect.top(), matchWidth, textRect.height());
+    painter->fillRect(matchRect, QColor(255, 220, 220));  // light red
+
+    // Set text pen color depending on selection state
+    QColor penColor = option.state & QStyle::State_Selected
+        ? option.palette.highlightedText().color()
+        : option.palette.text().color();
+
+    painter->setPen(penColor);
+
+    // Draw the whole text
+    painter->drawText(x, y, before + match + after);
 
     painter->restore();
 }
+
 
