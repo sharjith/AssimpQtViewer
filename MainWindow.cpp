@@ -69,6 +69,9 @@ MainWindow::MainWindow(QWidget* parent)
 		if (!filePath.isEmpty()) loadModel(filePath);
 		});
 
+	QAction* exitAct = fileMenu->addAction("Exit");
+	connect(exitAct, &QAction::triggered, this, &QWidget::close);
+
 	connect(_searchBox, &QLineEdit::textChanged, this, &MainWindow::filterTree);
 }
 
