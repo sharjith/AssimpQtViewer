@@ -39,6 +39,10 @@ protected:
 
     void resizeEvent(QResizeEvent* event);
 
+
+signals:
+    void nodePicked(aiNode* node);
+
 private slots:
     void onInertiaTimeout();
 
@@ -51,6 +55,15 @@ private:
     void setViewLeft();
     void setViewAxonometric();    
     void fitToView();
+    void pickAtScreenPosition(const QPoint& pos);
+    void pickRay(const aiVector3D& origin, const aiVector3D& dir);
+    bool rayIntersectsTriangle(
+        const aiVector3D& orig, const aiVector3D& dir,
+        const aiVector3D& v0, const aiVector3D& v1, const aiVector3D& v2,
+        float& outT
+    );
+    aiNode* findNodeForMesh(aiNode* node, int meshIndex);
+
     QToolButton* createViewButton(const QString& iconPath, const QString& tooltip, const std::function<void()>& callback, QWidget* parent = nullptr);
 
 private:
@@ -68,7 +81,7 @@ private:
     bool _sceneUpdated;
 
     // Interaction modes
-    enum class InteractionMode { None, Zoom, Rotate, Pan };
+    enum class InteractionMode { Select, Zoom, Rotate, Pan };
 
     QPoint m_lastMousePos;
     float m_rotationX = 0.0f, m_rotationY = 0.0f;
@@ -76,7 +89,7 @@ private:
     float m_zoom = 1.0f;
     float m_azimuth = 0.0f;     // Horizontal angle in degrees
     float m_elevation = 20.0f;  // Vertical angle in degrees
-    InteractionMode m_mode = InteractionMode::None;
+    InteractionMode m_mode = InteractionMode::Select;
 
 	ViewProjection m_viewProjection = ViewProjection::Custom;
 
@@ -88,5 +101,6 @@ private:
     QPointF m_panSpeed = { 0, 0 };
     float m_zoomSpeed = 0.f;
     QTimer* m_inertiaTimer = nullptr;
+	aiNode* m_lastPickedNode = nullptr;
 
 };

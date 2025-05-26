@@ -262,14 +262,18 @@ void ModelViewerWidget::mousePressEvent(QMouseEvent* event)
 
     m_lastMousePos = event->pos();
 
-    if (event->button() == Qt::LeftButton)
+    if (event->button() == Qt::LeftButton && (event->modifiers() & Qt::ControlModifier))
         m_mode = InteractionMode::Rotate;
     else if (event->button() == Qt::RightButton)
         m_mode = InteractionMode::Pan;
 	else if (event->button() == Qt::MiddleButton)
         m_mode = InteractionMode::Zoom;
     else
-        m_mode = InteractionMode::None;    
+        m_mode = InteractionMode::Select;    
+
+    if (event->button() == Qt::LeftButton && m_mode == InteractionMode::Select) {
+        pickAtScreenPosition(event->pos());
+    }
 }
 
 
@@ -327,7 +331,7 @@ void ModelViewerWidget::mouseReleaseEvent(QMouseEvent* event)
         m_inertiaTimer->start();
 
     Q_UNUSED(event);
-    m_mode = InteractionMode::None;
+    m_mode = InteractionMode::Select;
 }
 
 void ModelViewerWidget::wheelEvent(QWheelEvent* event)
@@ -503,3 +507,134 @@ void ModelViewerWidget::onInertiaTimeout()
 
     update();
 }
+
+void ModelViewerWidget::pickAtScreenPosition(const QPoint& pos) {
+    makeCurrent(); // Needed if using Qt with OpenGL
+
+    GLint viewport[4];
+    GLdouble modelview[16], projection[16];
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
+    glGetDoublev(GL_PROJECTION_MATRIX, projection);
+    glGetIntegerv(GL_VIEWPORT, viewport);
+
+    float x = pos.x();
+    float y = viewport[3] - pos.y(); // Flip Y for OpenGL
+
+    // Near and far points
+    double nearX, nearY, nearZ;
+    double farX, farY, farZ;
+
+    gluUnProject(x, y, 0.0, modelview, projection, viewport, &nearX, &nearY, &nearZ);
+    gluUnProject(x, y, 1.0, modelview, projection, viewport, &farX, &farY, &farZ);
+
+    aiVector3D rayOrigin((float)nearX, (float)nearY, (float)nearZ);
+    aiVector3D rayDirection((float)(farX - nearX), (float)(farY - nearY), (float)(farZ - nearZ));
+    rayDirection.Normalize();
+
+    pickRay(rayOrigin, rayDirection);
+}
+
+void ModelViewerWidget::pickRay(const aiVector3D& origin, const aiVector3D& dir) {
+    float minDistance = std::numeric_limits<float>::max();
+    int hitMeshIndex = -1;
+    aiMatrix4x4 hitTransform;
+
+    // Track intersected mesh index
+    std::function<void(aiNode*, const aiMatrix4x4&)> traverse;
+    traverse = [&](aiNode* node, const aiMatrix4x4& parentTransform) {
+        aiMatrix4x4 transform = parentTransform * node->mTransformation;
+
+        for (unsigned i = 0; i < node->mNumMeshes; ++i) {
+            const int meshIndex = node->mMeshes[i];
+            const aiMesh* mesh = scene->mMeshes[meshIndex];
+
+            for (unsigned f = 0; f < mesh->mNumFaces; ++f) {
+                const aiFace& face = mesh->mFaces[f];
+                if (face.mNumIndices != 3) continue;
+
+                aiVector3D v0 = mesh->mVertices[face.mIndices[0]];
+                aiVector3D v1 = mesh->mVertices[face.mIndices[1]];
+                aiVector3D v2 = mesh->mVertices[face.mIndices[2]];
+
+                v0 *= transform;
+                v1 *= transform;
+                v2 *= transform;
+
+                float t;
+                if (rayIntersectsTriangle(origin, dir, v0, v1, v2, t)) {
+                    if (t < minDistance) {
+                        minDistance = t;
+                        hitMeshIndex = meshIndex;
+                        hitTransform = transform;
+                    }
+                }
+            }
+        }
+
+        for (unsigned i = 0; i < node->mNumChildren; ++i)
+            traverse(node->mChildren[i], transform);
+        };
+
+    traverse(scene->mRootNode, aiMatrix4x4());
+
+    if (hitMeshIndex != -1) {
+        aiNode* hitNode = findNodeForMesh(scene->mRootNode, hitMeshIndex);
+        if (m_lastPickedNode == hitNode) {
+            emit nodePicked(nullptr); // Signal to deselect
+            m_lastPickedNode = nullptr;
+        }
+        else {
+            emit nodePicked(hitNode);
+            m_lastPickedNode = hitNode;
+        }
+		highlightNode(m_lastPickedNode);
+    }
+}
+
+
+bool ModelViewerWidget::rayIntersectsTriangle(
+    const aiVector3D& orig, const aiVector3D& dir,
+    const aiVector3D& v0, const aiVector3D& v1, const aiVector3D& v2,
+    float& outT
+)
+{
+    const float EPSILON = 1e-5f;
+    aiVector3D edge1 = v1 - v0;
+    aiVector3D edge2 = v2 - v0;
+    aiVector3D h = dir ^ edge2;
+    float a = edge1 * h;
+    if (fabs(a) < EPSILON) return false;
+
+    float f = 1.0f / a;
+    aiVector3D s = orig - v0;
+    float u = f * (s * h);
+    if (u < 0.0 || u > 1.0) return false;
+
+    aiVector3D q = s ^ edge1;
+    float v = f * (dir * q);
+    if (v < 0.0 || u + v > 1.0) return false;
+
+    float t = f * (edge2 * q);
+    if (t > EPSILON) {
+        outT = t;
+        return true;
+    }
+
+    return false;
+}
+
+aiNode* ModelViewerWidget::findNodeForMesh(aiNode* node, int meshIndex) {
+    for (unsigned i = 0; i < node->mNumMeshes; ++i) {
+        if (node->mMeshes[i] == meshIndex)
+            return node;
+    }
+
+    for (unsigned i = 0; i < node->mNumChildren; ++i) {
+        aiNode* result = findNodeForMesh(node->mChildren[i], meshIndex);
+        if (result)
+            return result;
+    }
+
+    return nullptr;
+}
+

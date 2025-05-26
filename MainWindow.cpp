@@ -14,22 +14,22 @@
 #include "QtAssimpProgressHandler.h"
 
 MainWindow::MainWindow(QWidget* parent)
-	: QMainWindow(parent), _viewer(new ModelViewerWidget(this)), _treeWidget(new QTreeWidget(this)) {
+	: QMainWindow(parent), m_viewerWidget(new ModelViewerWidget(this)), m_treeWidget(new QTreeWidget(this)) {
 
-	auto* delegate = new HighlightDelegate(_treeWidget);
-	_treeWidget->setItemDelegate(delegate);
-	_highlightDelegate = delegate; // store as member if needed
-	_treeWidget->setHeaderHidden(true);
-	connect(_treeWidget, &QTreeWidget::itemClicked, this, &MainWindow::onTreeItemClicked);
+	auto* delegate = new HighlightDelegate(m_treeWidget);
+	m_treeWidget->setItemDelegate(delegate);
+	m_highlightDelegate = delegate; // store as member if needed
+	m_treeWidget->setHeaderHidden(true);
+	connect(m_treeWidget, &QTreeWidget::itemClicked, this, &MainWindow::onTreeItemClicked);
 
 	QVBoxLayout* layout = new QVBoxLayout;
-	_searchBox = new QLineEdit(this);
-	_searchBox->setPlaceholderText("Search...");
-	_searchBox->setClearButtonEnabled(true);
-	_searchBox->hide(); // Hide the search box initially
+	m_searchBox = new QLineEdit(this);
+	m_searchBox->setPlaceholderText("Search...");
+	m_searchBox->setClearButtonEnabled(true);
+	m_searchBox->hide(); // Hide the search box initially
 
-	layout->addWidget(_searchBox);
-	layout->addWidget(_treeWidget); // existing QTreeWidget
+	layout->addWidget(m_searchBox);
+	layout->addWidget(m_treeWidget); // existing QTreeWidget
 
 	QWidget* treePanel = new QWidget;
 	treePanel->setLayout(layout);
@@ -39,20 +39,20 @@ MainWindow::MainWindow(QWidget* parent)
 	viewerLayout->setContentsMargins(0, 0, 0, 0);
 	viewerLayout->setSpacing(0);
 
-	_progressBar = new QProgressBar;
-	_progressBar->setObjectName("progressBar");
-	_progressBar->setFixedHeight(10);
-	_progressBar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-	_progressBar->setTextVisible(false);
-	_progressBar->setRange(0, 100);  // Default range
-	_progressBar->setValue(0);  // Default value
+	m_progressBar = new QProgressBar;
+	m_progressBar->setObjectName("progressBar");
+	m_progressBar->setFixedHeight(10);
+	m_progressBar->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+	m_progressBar->setTextVisible(false);
+	m_progressBar->setRange(0, 100);  // Default range
+	m_progressBar->setValue(0);  // Default value
 	// Minimal styling
-	_progressBar->setStyleSheet(R"(
+	m_progressBar->setStyleSheet(R"(
     QProgressBar { border: 0; background-color: transparent; }
     QProgressBar::chunk { background-color: #0078d7; })");
 
-	viewerLayout->addWidget(_viewer);
-	viewerLayout->addWidget(_progressBar);
+	viewerLayout->addWidget(m_viewerWidget);
+	viewerLayout->addWidget(m_progressBar);
 	viewerLayout->setStretch(0, 1);
 	viewerLayout->setStretch(1, 0);
 
@@ -72,35 +72,38 @@ MainWindow::MainWindow(QWidget* parent)
 	QAction* exitAct = fileMenu->addAction("Exit");
 	connect(exitAct, &QAction::triggered, this, &QWidget::close);
 
-	connect(_searchBox, &QLineEdit::textChanged, this, &MainWindow::filterTree);
+	connect(m_searchBox, &QLineEdit::textChanged, this, &MainWindow::filterTree);
+	connect(m_viewerWidget, &ModelViewerWidget::nodePicked,
+		this, &MainWindow::selectTreeNodeFor);
+
 }
 
 void MainWindow::loadModel(const QString& path) {
-	_progressBar->setValue(0);
-	_progressBar->setRange(0, 100);
-	_progressBar->setVisible(true);
+	m_progressBar->setValue(0);
+	m_progressBar->setRange(0, 100);
+	m_progressBar->setVisible(true);
 
 	auto* handler = new QtAssimpProgressHandler(this);
-	_viewer->getImporter()->SetProgressHandler(handler);
+	m_viewerWidget->getImporter()->SetProgressHandler(handler);
 
 	connect(handler, &QtAssimpProgressHandler::progressChanged, this, [this](int percent) {
-		_progressBar->setValue(percent);
+		m_progressBar->setValue(percent);
 		});
 
-	_progressBar->setVisible(false);
+	m_progressBar->setVisible(false);
 
-	_treeWidget->clear();
-	_viewer->loadModel(path);
+	m_treeWidget->clear();
+	m_viewerWidget->loadModel(path);
 
-	const aiScene* scene = _viewer->getScene();
+	const aiScene* scene = m_viewerWidget->getScene();
 	if (scene) {
 		populateTree(scene);
-		_searchBox->show();
-		_treeWidget->expandAll();
+		m_searchBox->show();
+		m_treeWidget->expandAll();
 	}
 	
-	_progressBar->setValue(100);
-	_progressBar->setVisible(false);
+	m_progressBar->setValue(100);
+	m_progressBar->setVisible(false);
 }
 
 
@@ -112,8 +115,9 @@ void MainWindow::populateTree(const aiScene* scene) {
 		QTreeWidgetItem* item = new QTreeWidgetItem();
 		item->setText(0, QString::fromUtf8(node->mName.C_Str()));
 		item->setData(0, Qt::UserRole, QVariant::fromValue<void*>(node));
+		m_nodeToItem[node] = item;
 		if (parentItem) parentItem->addChild(item);
-		else _treeWidget->addTopLevelItem(item);
+		else m_treeWidget->addTopLevelItem(item);
 		for (unsigned i = 0; i < node->mNumChildren; ++i)
 			recurse(node->mChildren[i], item);
 		};
@@ -122,14 +126,14 @@ void MainWindow::populateTree(const aiScene* scene) {
 
 void MainWindow::onTreeItemClicked(QTreeWidgetItem* item, int column) {
 	aiNode* node = static_cast<aiNode*>(item->data(0, Qt::UserRole).value<void*>());
-	_viewer->highlightNode(node);
+	m_viewerWidget->highlightNode(node);
 }
 
 
 void MainWindow::filterTree(const QString& text) {
 
-	if (_highlightDelegate)
-		_highlightDelegate->setPattern(text);
+	if (m_highlightDelegate)
+		m_highlightDelegate->setPattern(text);
 	auto matches = [=](const QString& pattern, const QString& value) -> int {
 		int score = 0;
 		int patternIndex = 0;
@@ -143,7 +147,7 @@ void MainWindow::filterTree(const QString& text) {
 		return (patternIndex == pattern.size()) ? score : 0;
 		};
 
-	QTreeWidgetItemIterator it(_treeWidget);
+	QTreeWidgetItemIterator it(m_treeWidget);
 	while (*it) {
 		QTreeWidgetItem* item = *it;
 		const QString itemText = item->text(0);
@@ -165,9 +169,27 @@ void MainWindow::filterTree(const QString& text) {
 	}
 
 	if (text.isEmpty()) {
-		_treeWidget->collapseAll();  // Optional: collapse everything when cleared
+		m_treeWidget->collapseAll();  // Optional: collapse everything when cleared
 	}
 
-	_treeWidget->viewport()->update();
+	m_treeWidget->viewport()->update();
+}
+
+void MainWindow::selectTreeNodeFor(aiNode* node) {
+	// If this node is already selected, deselect it
+	if (m_currentlySelectedNode == node) {
+		m_treeWidget->setCurrentItem(nullptr);
+		m_currentlySelectedNode = nullptr;
+		return;
+	}
+
+	auto it = m_nodeToItem.find(node);
+	if (it != m_nodeToItem.end()) {
+		QTreeWidgetItem* item = it->second;
+		m_treeWidget->setCurrentItem(item);
+		m_treeWidget->scrollToItem(item);
+		item->setSelected(true);
+		m_currentlySelectedNode = node;
+	}
 }
 
