@@ -35,10 +35,15 @@ set(HEADERS
     QtAssimpProgressHandler.h
 )
 
-set(APP_ICON_RC "${CMAKE_CURRENT_SOURCE_DIR}/icon.rc")
-
 # Main executable
-add_executable(AssimpQtViewer ${SOURCES} ${HEADERS} ${APP_ICON_RC})
+add_executable(AssimpQtViewer ${SOURCES} ${HEADERS})
+
+if(WIN32)
+    target_sources(AssimpQtViewer
+        PRIVATE
+            icon.rc
+    )   
+endif()
 
 
 
