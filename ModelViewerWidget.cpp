@@ -262,14 +262,17 @@ void ModelViewerWidget::mousePressEvent(QMouseEvent* event)
 
     m_lastMousePos = event->pos();
 
-    if (event->button() == Qt::LeftButton && (event->modifiers() & Qt::ControlModifier))
-        m_mode = InteractionMode::Rotate;
-    else if (event->button() == Qt::RightButton)
-        m_mode = InteractionMode::Pan;
-	else if (event->button() == Qt::MiddleButton)
-        m_mode = InteractionMode::Zoom;
+    if ((event->modifiers() & Qt::ControlModifier))
+    {
+        if (event->button() == Qt::LeftButton)
+            m_mode = InteractionMode::Rotate;
+        else if (event->button() == Qt::RightButton)
+            m_mode = InteractionMode::Pan;
+        else if (event->button() == Qt::MiddleButton)
+            m_mode = InteractionMode::Zoom;       
+    }
     else
-        m_mode = InteractionMode::Select;    
+        m_mode = InteractionMode::Select;
 
     if (event->button() == Qt::LeftButton && m_mode == InteractionMode::Select) {
         pickAtScreenPosition(event->pos());
