@@ -1,17 +1,17 @@
 #include "MainWindow.h"
+#include <assimp/Importer.hpp>
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
 #include <QApplication>
-#include <QSplitter>
-#include <QVBoxLayout>
 #include <QFileDialog>
 #include <QLineEdit>
 #include <QMenuBar>
-#include <QProgressBar>
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
-#include <QMetaObject>
-#include <QtConcurrent>
 #include <QMessageBox>
+#include <QMetaObject>
+#include <QProgressBar>
+#include <QSplitter>
+#include <QtConcurrent>
+#include <QVBoxLayout>
 
 #include "AssimpProgressHandler.h"
 
@@ -118,8 +118,7 @@ void MainWindow::loadModel(const QString& path) {
 	m_progressBar->setValue(100);
 	m_progressBar->setVisible(false);
 
-	disconnect(handler, SIGNAL(progressChanged(float)), this, SLOT(showFileReadingProgress(float)));
-	//delete _progHandler; // causes crash
+	disconnect(handler, SIGNAL(progressChanged(float)), this, SLOT(showFileReadingProgress(float)));	
 	handler = nullptr;
 }
 
@@ -131,19 +130,9 @@ void MainWindow::showFileReadingProgress(float percent)
 void MainWindow::setProgressValue(const int& value)
 {
 	if (value == 0)
-	{
 		m_progressBar->reset();
-#if defined _WIN32 && QT_VERSION_MAJOR == 5
-		_mainWindow->_windowsTaskbarProgress->reset();
-#endif 
-	}
 	else
-	{
 		m_progressBar->setValue(value);
-#if defined _WIN32 && QT_VERSION_MAJOR == 5
-		_mainWindow->_windowsTaskbarProgress->setValue(value);
-#endif 
-	}
 	m_progressBar->update();
 	qApp->processEvents();
 }

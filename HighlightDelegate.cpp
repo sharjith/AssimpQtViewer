@@ -55,7 +55,7 @@ void HighlightDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opt
 
     // Highlight background for matched text
     QRect matchRect(x + beforeWidth, textRect.top(), matchWidth, textRect.height());
-    painter->fillRect(matchRect, QColor(255, 220, 220));  // light red
+    painter->fillRect(matchRect, QColor(255, 120, 120));  // light red
 
     // Set text pen color depending on selection state
     QColor penColor = option.state & QStyle::State_Selected

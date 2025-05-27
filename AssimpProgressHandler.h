@@ -1,15 +1,15 @@
 #include <assimp/ProgressHandler.hpp>
-#include <QProgressBar>
+#include <iostream>
 #include <QMetaObject>
 #include <QObject>
+#include <QProgressBar>
 #include <QThread>
-#include <iostream>
 
 class AssimpProgressHandler : public QObject, public Assimp::ProgressHandler {
 	Q_OBJECT
 public:
 
-    // Required by Qt system. TODO: Make sure it is fine
+    // Required by Qt system.
     inline void* operator new(size_t, void* ptr) noexcept
     {
         return ptr;
@@ -17,8 +17,7 @@ public:
 
     using Assimp::ProgressHandler::operator new;
 
-    bool Update(float percentage) override {
-		//std::cout << "Progress: " << percentage * 100 << "%" << std::endl;
+    bool Update(float percentage) override {		
         emit progressChanged(percentage);
         return true;
     }

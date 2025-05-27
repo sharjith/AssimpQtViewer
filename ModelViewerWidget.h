@@ -1,11 +1,11 @@
 #pragma once
 
-#include <QOpenGLWidget>
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
 #include <QOpenGLFunctions>
+#include <QOpenGLWidget>
 #include <QString>
 #include <QToolButton>
-#include <assimp/scene.h>
-#include <assimp/Importer.hpp>
 
 enum class ViewProjection {
     Top,

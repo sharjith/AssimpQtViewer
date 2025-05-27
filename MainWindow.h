@@ -1,10 +1,10 @@
 ﻿#pragma once
 
-#include <QMainWindow>
-#include "ModelViewerWidget.h"
-#include <QTreeWidget>
-#include <QProgressBar>
 #include "HighlightDelegate.h"
+#include "ModelViewerWidget.h"
+#include <QMainWindow>
+#include <QProgressBar>
+#include <QTreeWidget>
 
 class MainWindow : public QMainWindow {
     Q_OBJECT

@@ -1,15 +1,18 @@
 #define NOMINMAX
 
 #include "ModelViewerWidget.h"
-#include <QMatrix4x4>
-#include <QMouseEvent>
-#include <QDebug>
-#include <QHBoxLayout>
-#include <QPushButton>
-#include <QToolButton>
-#include <QTimer>
 #include <assimp/postprocess.h>
 #include <cfloat>
+#include <QDebug>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QHBoxLayout>
+#include <QMatrix4x4>
+#include <QMouseEvent>
+#include <QPushButton>
+#include <QTimer>
+#include <QToolButton>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -198,9 +201,6 @@ void ModelViewerWidget::paintGL() {
         drawNode(m_scene->mRootNode);
 }
 
-#include <QFile>
-#include <QFileInfo>
-#include <QDir>
 void ModelViewerWidget::loadModel(const QString &filePath) {
     
     if (m_scene)

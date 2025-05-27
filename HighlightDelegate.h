@@ -1,7 +1,7 @@
 // HighlightDelegate.h
 #pragma once
-#include <QStyledItemDelegate>
 #include <QRegularExpression>
+#include <QStyledItemDelegate>
 
 class HighlightDelegate : public QStyledItemDelegate {
     Q_OBJECT
