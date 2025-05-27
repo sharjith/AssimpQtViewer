@@ -81,15 +81,29 @@ void ModelViewerWidget::initializeGL() {
     glEnable(GL_NORMALIZE); // Normalize normals for non-uniform scaling
     glEnable(GL_COLOR_MATERIAL);
 
-    glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+    glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE);
 
     // Set light position and color
-    GLfloat lightPos[] = { 0.0f, 0.0f, 1.0f, 0.0f };
+    GLfloat lightPos[] = { 0.0f, 0.0f, m_viewRadius, 0.0f };
     glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
 
     GLfloat lightColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
     glLightfv(GL_LIGHT0, GL_DIFFUSE, lightColor);
     glLightfv(GL_LIGHT0, GL_SPECULAR, lightColor);
+
+    GLfloat materialAmbient[] = { 0.2f, 0.2f, 0.2f, 1.0f };
+    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, materialAmbient);
+
+    // Set specular material color
+    GLfloat materialSpecular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, materialSpecular);
+
+    // Set shininess (range: 0 to 128; higher = smaller, sharper highlight)
+    GLfloat shininess = 64.0f;
+    glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, shininess);
+
+    glShadeModel(GL_SMOOTH);
+	glEnable(GL_NORMALIZE); // Normalize normals for non-uniform scaling
 
     float fovYRadians = 45.0f * M_PI / 180.0f;
     m_cameraDistance = m_viewRadius / std::tan(fovYRadians * 0.5f);
