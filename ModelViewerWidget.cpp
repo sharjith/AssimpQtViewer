@@ -95,7 +95,7 @@ void ModelViewerWidget::initializeGL() {
     glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, materialAmbient);
 
     // Set specular material color
-    GLfloat materialSpecular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+    GLfloat materialSpecular[] = { 0.5f, 0.5f, 0.5f, 1.0f };
     glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, materialSpecular);
 
     // Set shininess (range: 0 to 128; higher = smaller, sharper highlight)
@@ -308,6 +308,17 @@ void ModelViewerWidget::drawNode(aiNode* node)
             glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
         }
 
+        if(node == m_highlightedNode && !texId) {
+			// Set full specular material color for highlighted node
+            GLfloat materialSpecular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+            glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, materialSpecular);
+		}
+		else {
+            // Set default specular color
+            GLfloat materialSpecular[] = { 0.5f, 0.5f, 0.5f, 1.0f };
+			glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, materialSpecular); 
+		}
+
         glBegin(GL_TRIANGLES);
         for (unsigned int j = 0; j < mesh->mNumFaces; ++j) {
             const aiFace& face = mesh->mFaces[j];
@@ -343,8 +354,7 @@ void ModelViewerWidget::drawNode(aiNode* node)
 
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
             glLineWidth(0.50f);
-            glColor3d(204, 255, 0); // Flourescent Yellow highlight
-
+            glColor3d(204, 255, 0); // Flourescent Yellow highlight           
             glBegin(GL_TRIANGLES);
             for (unsigned int j = 0; j < mesh->mNumFaces; ++j) {
                 const aiFace& face = mesh->mFaces[j];
