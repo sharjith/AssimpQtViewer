@@ -403,7 +403,7 @@ void ModelViewerWidget::mousePressEvent(QMouseEvent* event)
     else
         m_mode = InteractionMode::Select;
 
-    if (event->button() == Qt::LeftButton && m_mode == InteractionMode::Select) {
+    if (event->button() == Qt::LeftButton && m_mode == InteractionMode::Select && m_scene) {
         pickAtScreenPosition(event->pos());
     }
 }
