@@ -47,6 +47,7 @@ private slots:
     void onInertiaTimeout();
 
 private:   
+    void drawGradientBackground();
     void drawNode(aiNode* node);
     GLuint loadTextureIfNeeded(const aiMaterial* material, unsigned int materialIndex);
 	void updateCamera();

@@ -174,9 +174,43 @@ void ModelViewerWidget::updateCamera() {
     m_zoom = 1.0f;
 }
 
+void ModelViewerWidget::drawGradientBackground() {
+    glPushAttrib(GL_ENABLE_BIT | GL_TRANSFORM_BIT | GL_CURRENT_BIT); // Save state
+
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_LIGHTING); // Disable lighting if enabled by model draw
+
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    glOrtho(-1, 1, -1, 1, -1, 1);
+
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+
+    glBegin(GL_QUADS);
+    glColor3f(0.3f, 0.3f, 0.3f); glVertex2f(-1.0f, 1.0f);   // Top left
+    glColor3f(0.55f, 0.55f, 0.55f); glVertex2f(1.0f, 1.0f);    // Top right
+    glColor3f(0.95f, 0.95f, 0.95f); glVertex2f(1.0f, -1.0f);   // Bottom right
+    glColor3f(0.7f, 0.7f, 0.7f); glVertex2f(-1.0f, -1.0f);     // Bottom left
+    glEnd();
+
+    glPopMatrix(); // MODELVIEW
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+
+    glPopAttrib(); // Restore GL state
+}
+
+
 void ModelViewerWidget::paintGL() {
+
+    glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+
+	drawGradientBackground();
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -594,7 +628,7 @@ void ModelViewerWidget::onInertiaTimeout()
 {
     if (m_isDragging) return;
 
-    constexpr float damping = 0.90f;
+    constexpr float damping = 0.75f;
 
     // Rotation inertia
     m_azimuth += m_azimuthSpeed;
