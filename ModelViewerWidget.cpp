@@ -120,7 +120,7 @@ void ModelViewerWidget::resizeGL(int w, int h) {
 	glMatrixMode(GL_MODELVIEW);
 }
 
-void computeBoundingBox(const aiScene* scene, const aiNode* node,
+void ModelViewerWidget::computeBoundingBox(const aiScene* scene, const aiNode* node,
 	aiVector3D& minimum, aiVector3D& maximum, const aiMatrix4x4& transform)
 {
 	aiMatrix4x4 currentTransform = transform * node->mTransformation;
