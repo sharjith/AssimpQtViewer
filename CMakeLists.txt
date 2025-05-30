@@ -25,6 +25,7 @@ set(SOURCES
 	MainWindow.cpp
     ModelViewerWidget.cpp    
     HighlightDelegate.cpp    
+    GLCamera.cpp
     Resource.qrc
 )
 
@@ -32,7 +33,8 @@ set(HEADERS
 	MainWindow.h
     ModelViewerWidget.h    
     HighlightDelegate.h
-    "AssimpProgressHandler.h"
+    GLCamera.h
+    AssimpProgressHandler.h
 )
 
 # Main executable
