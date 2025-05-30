@@ -94,8 +94,7 @@ private:
     float m_panX = 0.0f, m_panY = 0.0f;
     float m_zoom = 1.0f;
     float m_azimuth = -45.0f;     // Horizontal angle in degrees
-    float m_elevation = 35.0f;  // Vertical angle in degrees    
-    float m_viewZRot; // Z Axis rotation for view projections
+    float m_elevation = 35.0f;  // Vertical angle in degrees
     InteractionMode m_mode = InteractionMode::Select;
 
 	ViewProjection m_viewProjection = ViewProjection::Custom;

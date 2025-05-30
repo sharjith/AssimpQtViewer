@@ -35,10 +35,8 @@ ModelViewerWidget::ModelViewerWidget(QWidget* parent)
 	m_cameraDistance = 500;
 	m_sceneUpdated = false;
 	m_zoom = 1.0f;
-	m_azimuth = 0.0f;     // Horizontal angle in degrees
-	m_elevation = -45.0f;  // Vertical angle in degrees	
-	m_viewZRot = -45.0f;
-
+	float m_azimuth = 0.0f;     // Horizontal angle in degrees
+	float m_elevation = 20.0f;  // Vertical angle in degrees
 	m_inertiaTimer = new QTimer(this);
 	m_inertiaTimer->setInterval(16); // ~60 FPS
 	connect(m_inertiaTimer, &QTimer::timeout, this, &ModelViewerWidget::onInertiaTimeout);
@@ -267,8 +265,6 @@ void ModelViewerWidget::drawTrihedronOverlay() {
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	glLoadIdentity();
-
-
 	gluLookAt(0.0, 0.0, 5.0,  // Eye
 		0.0, 0.0, 0.0,  // Center
 		0.0, 1.0, 0.0); // Up
@@ -276,8 +272,6 @@ void ModelViewerWidget::drawTrihedronOverlay() {
 	// Apply only rotation (same as model view rotation)
 	glRotatef(m_elevation, 1.0f, 0.0f, 0.0f);
 	glRotatef(-m_azimuth, 0.0f, 1.0f, 0.0f);
-	glRotatef(m_viewZRot, 0, 0, 1);
-
 
 	drawTrihedron(); // The trihedron drawing function from earlier
 
@@ -305,9 +299,6 @@ void ModelViewerWidget::paintGL() {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
-	
-	
-
 	// Convert spherical coordinates to Cartesian
 	float radAzim = qDegreesToRadians(m_azimuth);
 	float radElev = qDegreesToRadians(m_elevation);
@@ -322,8 +313,6 @@ void ModelViewerWidget::paintGL() {
 		m_viewCenter.x, m_viewCenter.y, m_viewCenter.z,              // target
 		up.x, up.y, up.z                                          // up vector
 	);
-
-	glRotatef(m_viewZRot, 0, 0, 1);
 
 	if (m_scene) {
 
@@ -679,7 +668,6 @@ void ModelViewerWidget::setViewProjection(ViewProjection view)
 void ModelViewerWidget::setViewTop() {
 	m_azimuth = 0;
 	m_elevation = 0;   // looking straight down
-	m_viewZRot = 0;
 	m_zoom = 1.0f;
 	update();
 }
@@ -687,23 +675,20 @@ void ModelViewerWidget::setViewTop() {
 void ModelViewerWidget::setViewFront() {
 	m_azimuth = 0;
 	m_elevation = -90;
-	m_viewZRot = 0;
 	m_zoom = 1.0f;
 	update();
 }
 
 void ModelViewerWidget::setViewLeft() {
-	m_azimuth = 0;
-	m_elevation = -90;
-	m_viewZRot = 90;
+	m_azimuth = -90;
+	m_elevation = 0;
 	m_zoom = 1.0f;
 	update();
 }
 
 void ModelViewerWidget::setViewAxonometric() {
-	m_azimuth = 0;
-	m_elevation = -45;
-	m_viewZRot = -45;
+	m_azimuth = -45;
+	m_elevation = 35;
 	m_zoom = 1.0f;
 	update();
 }
