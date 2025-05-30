@@ -667,7 +667,7 @@ void ModelViewerWidget::setViewProjection(ViewProjection view)
 
 void ModelViewerWidget::setViewTop() {
 	m_azimuth = 0;
-	m_elevation = 0;   // looking straight down
+	m_elevation = 0;
 	m_zoom = 1.0f;
 	update();
 }
@@ -680,7 +680,7 @@ void ModelViewerWidget::setViewFront() {
 }
 
 void ModelViewerWidget::setViewLeft() {
-	m_azimuth = -90;
+	m_azimuth = 90;
 	m_elevation = 0;
 	m_zoom = 1.0f;
 	update();
