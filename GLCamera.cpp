@@ -134,6 +134,9 @@ void GLCamera::updateProjectionMatrix(void)
 		float camnear = _viewRange * 0.01f;
 		float camfar = _viewRange * 10000.0f;
 		_projectionMatrix.perspective(_FOV, aspect, camnear, camfar);
+
+		float shift = -_viewRange * 1.5f;
+		_projectionMatrix.translate(0.0f, 0.0f, shift);
 	}
 }
 

@@ -121,7 +121,7 @@ void ModelViewerWidget::resizeGL(int w, int h) {
 
 	m_camera->setScreenSize(w, h);
 	m_camera->setViewRange(m_viewRadius * 2.1f);
-	m_camera->setProjectionType(GLCamera::ProjectionType::ORTHOGRAPHIC);
+	m_camera->setProjectionType(GLCamera::ProjectionType::PERSPECTIVE);
 	m_viewMatrix = m_camera->getViewMatrix();
 	m_projectionMatrix = m_camera->getProjectionMatrix();
 	glMatrixMode(GL_MODELVIEW);
@@ -176,17 +176,15 @@ void ModelViewerWidget::updateCamera() {
 	float fovYRadians = 45.0f * M_PI / 180.0f;
 	m_cameraDistance = m_viewRadius / std::tan(fovYRadians * 0.5f);
 
-	// Set default camera position: looking from +Z axis
-	m_cameraPos = aiVector3D(m_viewCenter.x, m_viewCenter.y, m_viewCenter.z);
-	m_upVector = aiVector3D(0, 1, 0);
+	// Final camera position offset along Z axis (behind object)
+	QVector3D center(m_viewCenter.x, m_viewCenter.y, m_viewCenter.z);
+	QVector3D camPos = center + QVector3D(0, 0, m_cameraDistance);
 
 	m_camera->setViewRange(m_viewRadius * 2.1f);
-
+		
 	QVector3D viewPos(m_viewCenter.x, m_viewCenter.y, m_viewCenter.z);
-
-	m_camera->setPosition(viewPos);
-	m_camera->setZoom(1.0f);
-
+	m_camera->setPosition(viewPos);	
+	
 	m_viewMatrix = m_camera->getViewMatrix();
 	m_projectionMatrix = m_camera->getProjectionMatrix();
 
