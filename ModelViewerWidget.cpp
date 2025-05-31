@@ -1,6 +1,7 @@
 #define NOMINMAX
 
 #include "ModelViewerWidget.h"
+#include "GLCamera.h"
 #include <assimp/postprocess.h>
 #include <cfloat>
 #include <QDebug>
@@ -31,12 +32,13 @@ ModelViewerWidget::ModelViewerWidget(QWidget* parent)
 	fmt.setProfile(QSurfaceFormat::CompatibilityProfile);
 	QSurfaceFormat::setDefaultFormat(fmt);
 
+	m_modelMatrix.setToIdentity();
+	m_viewMatrix.setToIdentity();
+	m_projectionMatrix.setToIdentity();
+
 	m_viewRadius = 1000;
 	m_cameraDistance = 500;
 	m_sceneUpdated = false;
-	m_zoom = 1.0f;
-	float m_azimuth = 0.0f;     // Horizontal angle in degrees
-	float m_elevation = 20.0f;  // Vertical angle in degrees
 	m_inertiaTimer = new QTimer(this);
 	m_inertiaTimer->setInterval(16); // ~60 FPS
 	connect(m_inertiaTimer, &QTimer::timeout, this, &ModelViewerWidget::onInertiaTimeout);
@@ -105,8 +107,9 @@ void ModelViewerWidget::initializeGL() {
 	glShadeModel(GL_SMOOTH);
 	glEnable(GL_NORMALIZE); // Normalize normals for non-uniform scaling
 
-	float fovYRadians = 45.0f * M_PI / 180.0f;
-	m_cameraDistance = m_viewRadius / std::tan(fovYRadians * 0.5f);
+	m_camera = new GLCamera(height(), width(), m_viewRadius, 45);
+	m_camera->setProjectionType(GLCamera::ProjectionType::ORTHOGRAPHIC);
+	m_camera->setView(GLCamera::ViewProjection::SE_ISOMETRIC_VIEW);
 }
 
 void ModelViewerWidget::resizeGL(int w, int h) {
@@ -114,10 +117,80 @@ void ModelViewerWidget::resizeGL(int w, int h) {
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 
-	float nearPlane = m_viewRadius * 0.1f;
-	float farPlane = m_viewRadius * 10.0f;
-	gluPerspective(45.0, float(w) / h, nearPlane, farPlane);
+	if (h == 0) h = 1; // Prevent division by zero
+
+	m_camera->setScreenSize(w, h);
+	m_camera->setViewRange(m_viewRadius * 2.1f);
+	m_camera->setProjectionType(GLCamera::ProjectionType::ORTHOGRAPHIC);
+	m_viewMatrix = m_camera->getViewMatrix();
+	m_projectionMatrix = m_camera->getProjectionMatrix();
 	glMatrixMode(GL_MODELVIEW);
+}
+
+void ModelViewerWidget::paintGL() {
+
+	glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	drawGradientBackground();
+
+	m_viewMatrix.setToIdentity();
+	m_viewMatrix = m_camera->getViewMatrix();
+	m_projectionMatrix = m_camera->getProjectionMatrix();
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glLoadMatrixf(m_projectionMatrix.constData());
+
+	glMatrixMode(GL_MODELVIEW);
+	glLoadIdentity();
+		
+	QMatrix4x4 modelViewMatrix = m_viewMatrix * m_modelMatrix;
+	glLoadMatrixf(modelViewMatrix.constData());
+
+	if (m_scene) {
+
+		if (m_scene->mRootNode)
+			drawNode(m_scene->mRootNode);
+	}
+
+	drawTrihedronOverlay();
+}
+
+void ModelViewerWidget::updateCamera() {
+	// Update camera position based on the current rotation and zoom
+	if (!m_scene) {
+		return;
+	}
+	// After computing bounding box:
+	aiVector3D minimum(FLT_MAX, FLT_MAX, FLT_MAX);
+	aiVector3D maximum(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+
+	aiMatrix4x4 identity;
+	computeBoundingBox(m_scene, m_scene->mRootNode, minimum, maximum, identity);
+	float maxExtent = std::max({ maximum.x - minimum.x, maximum.y - minimum.y, maximum.z - minimum.z });
+	m_viewCenter = (maximum + minimum) * 0.5f;
+	m_viewRadius = maxExtent * 0.5f;
+
+	// Ideal distance from camera to model center based on FOV
+	float fovYRadians = 45.0f * M_PI / 180.0f;
+	m_cameraDistance = m_viewRadius / std::tan(fovYRadians * 0.5f);
+
+	// Set default camera position: looking from +Z axis
+	m_cameraPos = aiVector3D(m_viewCenter.x, m_viewCenter.y, m_viewCenter.z);
+	m_upVector = aiVector3D(0, 1, 0);
+
+	m_camera->setViewRange(m_viewRadius * 2.1f);
+
+	QVector3D viewPos(m_viewCenter.x, m_viewCenter.y, m_viewCenter.z);
+
+	m_camera->setPosition(viewPos);
+	m_camera->setZoom(1.0f);
+
+	m_viewMatrix = m_camera->getViewMatrix();
+	m_projectionMatrix = m_camera->getProjectionMatrix();
+
+	m_sceneUpdated = true;
 }
 
 void ModelViewerWidget::computeBoundingBox(const aiScene* scene, const aiNode* node,
@@ -145,33 +218,6 @@ void ModelViewerWidget::computeBoundingBox(const aiScene* scene, const aiNode* n
 	for (unsigned int i = 0; i < node->mNumChildren; ++i) {
 		computeBoundingBox(scene, node->mChildren[i], minimum, maximum, currentTransform);
 	}
-}
-
-void ModelViewerWidget::updateCamera() {
-	// Update camera position based on the current rotation and zoom
-	if (!m_scene) {
-		return;
-	}
-	// After computing bounding box:
-	aiVector3D minimum(FLT_MAX, FLT_MAX, FLT_MAX);
-	aiVector3D maximum(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-
-	aiMatrix4x4 identity;
-	computeBoundingBox(m_scene, m_scene->mRootNode, minimum, maximum, identity);
-	float maxExtent = std::max({ maximum.x - minimum.x, maximum.y - minimum.y, maximum.z - minimum.z });
-	m_viewCenter = (maximum + minimum) * 0.5f;
-	m_viewRadius = maxExtent * 0.5f;
-
-	// Ideal distance from camera to model center based on FOV
-	float fovYRadians = 45.0f * M_PI / 180.0f;
-	m_cameraDistance = m_viewRadius / std::tan(fovYRadians * 0.5f);
-
-	// Set default camera position: looking from +Z axis
-	m_cameraPos = aiVector3D(m_viewCenter.x, m_viewCenter.y, m_viewCenter.z + m_cameraDistance);
-	m_upVector = aiVector3D(0, 1, 0);
-
-	m_sceneUpdated = true;
-	m_zoom = 1.0f;
 }
 
 void ModelViewerWidget::drawGradientBackground() {
@@ -260,22 +306,27 @@ void ModelViewerWidget::drawTrihedronOverlay() {
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
 	glLoadIdentity();
-	gluPerspective(30.0, 1.0, 0.1, 10.0); // Narrow FOV for clearer axis
+	gluPerspective(30.0, 1.0, 0.1, 10.0); // Narrow FOV
 
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
 	glLoadIdentity();
-	gluLookAt(0.0, 0.0, 5.0,  // Eye
-		0.0, 0.0, 0.0,  // Center
-		0.0, 1.0, 0.0); // Up
+	gluLookAt(0.0, 0.0, 5.0,  // Eye position
+		0.0, 0.0, 0.0,  // Look at origin
+		0.0, 1.0, 0.0); // Up vector
 
-	// Apply only rotation (same as model view rotation)
-	glRotatef(m_elevation, 1.0f, 0.0f, 0.0f);
-	glRotatef(-m_azimuth, 0.0f, 1.0f, 0.0f);
+	// Extract the camera's rotation matrix
+	QMatrix4x4 view = m_camera->getViewMatrix();
 
-	drawTrihedron(); // The trihedron drawing function from earlier
+	// Remove translation component
+	view.setColumn(3, QVector4D(0, 0, 0, 1));
 
-	// Restore original matrices and viewport
+	// Apply only rotation part of the main camera
+	glMultMatrixf(view.constData());
+
+	drawTrihedron();
+
+	// Restore OpenGL state
 	glPopMatrix(); // ModelView
 	glMatrixMode(GL_PROJECTION);
 	glPopMatrix();
@@ -284,45 +335,6 @@ void ModelViewerWidget::drawTrihedronOverlay() {
 }
 
 
-void ModelViewerWidget::paintGL() {
-
-	glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-	drawGradientBackground();
-
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	float nearPlane = m_viewRadius * 0.1f;
-	float farPlane = m_viewRadius * 10.0f;
-	gluPerspective(45.0, float(width()) / height(), nearPlane, farPlane);
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
-
-	// Convert spherical coordinates to Cartesian
-	float radAzim = qDegreesToRadians(m_azimuth);
-	float radElev = qDegreesToRadians(m_elevation);
-	float x = m_cameraDistance * m_zoom * std::cos(radElev) * std::sin(radAzim);
-	float y = m_cameraDistance * m_zoom * std::sin(radElev);
-	float z = m_cameraDistance * m_zoom * std::cos(radElev) * std::cos(radAzim);
-
-	aiVector3D up = (std::cos(radElev) >= 0) ? aiVector3D(0, 1, 0) : aiVector3D(0, -1, 0);
-
-	gluLookAt(
-		x + m_viewCenter.x, y + m_viewCenter.y, z + m_viewCenter.z,  // camera position
-		m_viewCenter.x, m_viewCenter.y, m_viewCenter.z,              // target
-		up.x, up.y, up.z                                          // up vector
-	);
-
-	if (m_scene) {
-
-		if (m_scene->mRootNode)
-			drawNode(m_scene->mRootNode);
-	}
-
-
-	drawTrihedronOverlay();
-}
 
 void ModelViewerWidget::loadModel(const QString& filePath) {
 
@@ -490,13 +502,9 @@ void ModelViewerWidget::drawNode(aiNode* node)
 void ModelViewerWidget::mousePressEvent(QMouseEvent* event)
 {
 	m_isDragging = true;
+	m_totalMouseDelta = QPoint(0, 0); // Reset drag distance
 	if (m_inertiaTimer->isActive())
 		m_inertiaTimer->stop();
-
-	m_azimuthSpeed = 0.f;
-	m_elevationSpeed = 0.f;
-	m_panSpeed = { 0, 0 };
-	m_zoomSpeed = 0.f;
 
 	m_lastMousePos = event->pos();
 
@@ -521,46 +529,57 @@ void ModelViewerWidget::mousePressEvent(QMouseEvent* event)
 void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
 {
 	QPoint delta = event->pos() - m_lastMousePos;
-	m_lastMousePos = event->pos();
+	m_totalMouseDelta += delta;
+	QPoint downPoint = event->pos();
 
 	if (m_mode == InteractionMode::Rotate) {
-		m_azimuth -= delta.x() * 0.5f;
-		m_elevation += delta.y() * 0.5f;
 
-		// Save speeds for inertia
-		m_azimuthSpeed = -delta.x() * 0.5f;
-		m_elevationSpeed = delta.y() * 0.5f;
+		QPoint rotate = m_lastMousePos - downPoint;
+
+		m_camera->rotateX(rotate.y() / 2.0);
+		m_camera->rotateY(rotate.x() / 2.0);		
+
+		// Store rotation velocity
+		m_rotationVelocity = QVector2D(delta.x(), delta.y()) / 2.0f;
+		m_inertiaActive = false; // Stop inertia while dragging
 	}
 	else if (m_mode == InteractionMode::Pan) {
-		float radAzim = qDegreesToRadians(m_azimuth);
-		float radElev = qDegreesToRadians(m_elevation);
-
-		// Right vector in world space
-		aiVector3D right(std::cos(radAzim), 0, -std::sin(radAzim));
-
-		// Approximate up vector (in camera space, global Y up)
-		aiVector3D up(0, 1, 0);
-
-		right.Normalize();
-		up.Normalize();
 
 		// Pan speed scaled by distance
 		float panSpeed = m_cameraDistance * 0.001f;
 
 		// Apply panning to the view center
-		m_viewCenter -= right * (delta.x() * panSpeed);
-		m_viewCenter += up * (delta.y() * panSpeed);
+		QVector3D OP = get3dTranslationVectorFromMousePoints(downPoint, m_lastMousePos);
+		m_camera->move(OP.x(), OP.y(), OP.z());
 
-		// Save pan speed
-		m_panSpeed = QPointF(delta.x() * panSpeed, delta.y() * panSpeed);
+		m_panVelocity = OP;
+		m_inertiaActive = false;
+				
 	}
 	else if (m_mode == InteractionMode::Zoom) {
 		float zoomDelta = delta.y() * 0.01f;
-		m_zoom *= std::exp(-zoomDelta);
-		m_zoom = std::clamp(m_zoom, 0.01f, 10.0f);
 
-		m_zoomSpeed = -zoomDelta;
+		if (downPoint.x() > m_lastMousePos.x() || downPoint.y() < m_lastMousePos.y())
+			m_viewRadius /= 1.05f;
+		else
+			m_viewRadius *= 1.05f;
+		
+		// Translate to focus on mouse center
+		QPoint cen = QRect(0, 0, width(), height()).center();
+		float sign = (downPoint.x() > m_lastMousePos.x() || downPoint.y() < m_lastMousePos.y()) ? 1.0f : -1.0f;
+		QVector3D OP = get3dTranslationVectorFromMousePoints(cen, event->position().toPoint());
+		OP *= sign * 0.05f;
+		m_camera->move(OP.x(), OP.y(), OP.z());
+
+		// Store velocity
+		m_zoomVelocity = sign * 0.10f;
+		m_panVelocity = OP;
+		m_inertiaActive = false;
+
+		resizeGL(width(), height());
 	}
+
+	m_lastMousePos = downPoint;
 
 	update();
 }
@@ -568,22 +587,61 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
 void ModelViewerWidget::mouseReleaseEvent(QMouseEvent* event)
 {
 	m_isDragging = false;
-	if (!m_inertiaTimer->isActive())
-		m_inertiaTimer->start();
+	
+	int movementThreshold = 1; // Keep low for now
+	
+	if (m_totalMouseDelta.manhattanLength() > movementThreshold) 
+	{			
+		if (!m_inertiaTimer->isActive())
+		{
+			m_inertiaTimer->start(16); // 60 fps
+			m_inertiaActive = true;
+		}
+	}
+	else {
+		// No real movement — don't start inertia		
+		m_panVelocity = QVector3D(0, 0, 0);
+		m_zoomVelocity = 0.0f;
+		m_rotationVelocity = QVector2D(0, 0);
+		m_inertiaTimer->stop();
+	}
 
 	Q_UNUSED(event);
-	m_mode = InteractionMode::Select;
+	if (!(event->modifiers() & Qt::ControlModifier))
+		m_mode = InteractionMode::Select;
 }
 
 void ModelViewerWidget::wheelEvent(QWheelEvent* event)
 {
 	QPoint numDegrees = event->angleDelta() / 8;
 	if (!numDegrees.isNull()) {
-		m_zoomSpeed += numDegrees.y() / 800.0f;
-
+		
 		if (!m_inertiaTimer->isActive())
-			m_inertiaTimer->start();
+			m_inertiaTimer->start(16);
+
+		QPoint numSteps = numDegrees / 15;
+		float zoomStep = numSteps.y();
+		float zoomFactor = abs(zoomStep) + 0.05;
+
+		if (zoomStep < 0)
+			m_viewRadius *= zoomFactor;
+		else
+			m_viewRadius /= zoomFactor;
+
+		// Translate to focus on mouse center
+		QPoint cen = QRect(0, 0, width(), height()).center();
+		float sign = (event->position().x() > cen.x() || event->position().y() < cen.y() ||
+			(event->position().x() < cen.x() && event->position().y() > cen.y())) && (zoomStep > 0) ? 1.0f : -1.0f;
+		QVector3D OP = get3dTranslationVectorFromMousePoints(cen, event->position().toPoint());
+		OP *= sign * 0.05f;
+		m_camera->move(OP.x(), OP.y(), OP.z());
+
+		// Add to velocities instead of overriding
+		m_zoomVelocity += sign * 1.0f; // Tune factor
+		m_panVelocity += OP * sign * 0.05f;
+		
 	}
+	resizeGL(width(), height());
 	update();
 }
 
@@ -629,11 +687,6 @@ void ModelViewerWidget::resizeEvent(QResizeEvent* event) {
 
 
 void ModelViewerWidget::resetView() {
-	m_rotationX = 0.0f;
-	m_rotationY = 0.0f;
-	m_panX = 0.0f;
-	m_panY = 0.0f;
-	m_zoom = 1.0f;
 	m_cameraDistance = 0.0f;
 	m_viewCenter = aiVector3D(0, 0, 0);
 	m_viewRadius = 1.0f;
@@ -660,36 +713,30 @@ void ModelViewerWidget::setViewProjection(ViewProjection view)
 		// Do nothing or reset to user-controlled
 		break;
 	}
-	m_zoom = 1.0f;
+	
+	m_viewMatrix = m_camera->getViewMatrix();
+	m_projectionMatrix = m_camera->getProjectionMatrix();
 	update();
 }
 
 
 void ModelViewerWidget::setViewTop() {
-	m_azimuth = 0;
-	m_elevation = 0;
-	m_zoom = 1.0f;
+	m_camera->setView(GLCamera::ViewProjection::TOP_VIEW);
 	update();
 }
 
 void ModelViewerWidget::setViewFront() {
-	m_azimuth = 0;
-	m_elevation = -90;
-	m_zoom = 1.0f;
+	m_camera->setView(GLCamera::ViewProjection::FRONT_VIEW);
 	update();
 }
 
 void ModelViewerWidget::setViewLeft() {
-	m_azimuth = 90;
-	m_elevation = 0;
-	m_zoom = 1.0f;
+	m_camera->setView(GLCamera::ViewProjection::LEFT_VIEW);
 	update();
 }
 
 void ModelViewerWidget::setViewAxonometric() {
-	m_azimuth = -45;
-	m_elevation = 35;
-	m_zoom = 1.0f;
+	m_camera->setView(GLCamera::ViewProjection::SE_ISOMETRIC_VIEW);
 	update();
 }
 
@@ -699,55 +746,68 @@ void ModelViewerWidget::fitToView() {
 	update();
 }
 
-void ModelViewerWidget::onInertiaTimeout()
+void ModelViewerWidget::onInertiaTimeout() 
 {
-	if (m_isDragging) return;
+	if(m_mode == InteractionMode::Select)
+		return; // Don't apply inertia while selecting
+	if (!m_inertiaActive)
+		return;
 
-	constexpr float damping = 0.75f;
+	bool stillActive = false;
 
-	// Rotation inertia
-	m_azimuth += m_azimuthSpeed;
-	m_elevation += m_elevationSpeed;
-	m_azimuthSpeed *= damping;
-	m_elevationSpeed *= damping;
-
-	// Pan inertia
-	if (!m_panSpeed.isNull()) {
-		float radAzim = qDegreesToRadians(m_azimuth);
-		aiVector3D right(std::cos(radAzim), 0, -std::sin(radAzim));
-		aiVector3D up(0, 1, 0);
-		right.Normalize();
-		up.Normalize();
-
-		m_viewCenter -= right * static_cast<float>(m_panSpeed.x());
-		m_viewCenter += up * static_cast<float>(m_panSpeed.y());
-
-		m_panSpeed *= damping;
-		if (std::abs(m_panSpeed.x()) < 1e-5f && std::abs(m_panSpeed.y()) < 1e-5f)
-			m_panSpeed = { 0, 0 };
+	// Apply rotation inertia
+	if (!m_rotationVelocity.isNull()) {
+		m_camera->rotateX(-m_rotationVelocity.y());
+		m_camera->rotateY(-m_rotationVelocity.x());
+		m_rotationVelocity *= 0.90f;
+		if (m_rotationVelocity.length() > 0.01f)
+			stillActive = true;
+		else
+			m_rotationVelocity = QVector2D();
 	}
 
-	// Zoom inertia
-	if (std::abs(m_zoomSpeed) > 1e-5f) {
-		m_zoom *= std::exp(m_zoomSpeed);
-		m_zoom = std::clamp(m_zoom, 0.01f, 10.0f);
-		m_zoomSpeed *= damping;
-
-		if (std::abs(m_zoomSpeed) < 1e-5f)
-			m_zoomSpeed = 0.f;
+	// Apply pan inertia
+	if (!m_panVelocity.isNull()) {
+		m_camera->move(m_panVelocity.x(), m_panVelocity.y(), m_panVelocity.z());
+		m_panVelocity *= 0.90f;
+		if (m_panVelocity.length() > 0.0001f)
+			stillActive = true;
+		else
+			m_panVelocity = QVector3D();
 	}
 
-	// Stop if everything has slowed
-	if (std::abs(m_azimuthSpeed) < 0.01f &&
-		std::abs(m_elevationSpeed) < 0.01f &&
-		m_panSpeed.isNull() &&
-		std::abs(m_zoomSpeed) < 1e-5f)
-	{
+	// Apply zoom inertia
+	if (std::abs(m_zoomVelocity) > 0.001f) {
+		float zoomFactor = 1.005f;
+
+		if (m_zoomVelocity > 0)
+			m_viewRadius /= zoomFactor;
+		else
+			m_viewRadius *= zoomFactor;
+
+		// Zoom-centric pan
+		QPoint cen = rect().center();
+		QVector3D OP = get3dTranslationVectorFromMousePoints(cen, cen);
+		OP *= -m_zoomVelocity * 0.05f;
+		m_camera->move(OP.x(), OP.y(), OP.z());
+
+		m_zoomVelocity *= 0.75f;
+		if (std::abs(m_zoomVelocity) > 0.001f)
+			stillActive = true;
+		else
+			m_zoomVelocity = 0.0f;
+
+		resizeGL(width(), height());
+	}
+
+	if (!stillActive) {
+		m_inertiaActive = false;
 		m_inertiaTimer->stop();
 	}
 
 	update();
 }
+
 
 void ModelViewerWidget::pickAtScreenPosition(const QPoint& pos) {
 	makeCurrent(); // Needed if using Qt with OpenGL
@@ -883,3 +943,14 @@ aiNode* ModelViewerWidget::findNodeForMesh(aiNode* node, int meshIndex) {
 }
 
 
+QVector3D ModelViewerWidget::get3dTranslationVectorFromMousePoints(const QPoint& start, const QPoint& end)
+{		
+	QVector3D Z(0, 0, 0); // instead of 0 for x and y we need worldPosition.x() and worldPosition.y() ....
+	Z = Z.project(m_viewMatrix * m_modelMatrix, m_projectionMatrix, QRect(0, 0, width(), height()));
+	QVector3D p1(start.x(), height() - start.y(), Z.z());
+	QVector3D O = p1.unproject(m_viewMatrix * m_modelMatrix, m_projectionMatrix, QRect(0, 0, width(), height()));
+	QVector3D p2(end.x(), height() - end.y(), Z.z());
+	QVector3D P = p2.unproject(m_viewMatrix * m_modelMatrix, m_projectionMatrix, QRect(0, 0, width(), height()));
+	QVector3D OP = P - O;
+	return OP;
+}
