@@ -58,6 +58,30 @@ ModelViewerWidget::ModelViewerWidget(QWidget* parent)
 	layout->addWidget(createViewButton(":/icons/res/isometric.png", "Isometric View", [this]() { setViewAxonometric(); }, _viewToolbar));
 	layout->addWidget(createViewButton(":/icons/res/fit-all.png", "Fit All", [this]() { fitToView(); }, _viewToolbar));
 
+	QToolButton* projToggleButton = new QToolButton(_viewToolbar);
+	projToggleButton->setCheckable(true);
+	projToggleButton->setIcon(QIcon(":/icons/res/Perspective.png"));  // default icon
+	projToggleButton->setIconSize(QSize(64, 64));
+	projToggleButton->setToolTip("Toggle Projection");
+
+	connect(projToggleButton, &QToolButton::toggled, this, [this, projToggleButton](bool checked) {
+		if (checked) {
+			m_camera->setProjectionType(GLCamera::ProjectionType::ORTHOGRAPHIC);
+			projToggleButton->setIcon(QIcon(":/icons/res/Ortho.png"));
+			projToggleButton->setIconSize(QSize(64, 64));
+			projToggleButton->setToolTip("Switch to Perspective");
+		}
+		else {
+			m_camera->setProjectionType(GLCamera::ProjectionType::PERSPECTIVE);
+			projToggleButton->setIcon(QIcon(":/icons/res/Perspective.png"));
+			projToggleButton->setIconSize(QSize(64, 64));
+			projToggleButton->setToolTip("Switch to Orthographic");
+		}		
+		update();
+		});
+
+	layout->addWidget(projToggleButton);
+
 	setFocusPolicy(Qt::StrongFocus);
 }
 
@@ -108,7 +132,7 @@ void ModelViewerWidget::initializeGL() {
 	glEnable(GL_NORMALIZE); // Normalize normals for non-uniform scaling
 
 	m_camera = new GLCamera(height(), width(), m_viewRadius, 45);
-	m_camera->setProjectionType(GLCamera::ProjectionType::ORTHOGRAPHIC);
+	m_camera->setProjectionType(GLCamera::ProjectionType::PERSPECTIVE);
 	m_camera->setView(GLCamera::ViewProjection::SE_ISOMETRIC_VIEW);
 }
 
@@ -120,8 +144,7 @@ void ModelViewerWidget::resizeGL(int w, int h) {
 	if (h == 0) h = 1; // Prevent division by zero
 
 	m_camera->setScreenSize(w, h);
-	m_camera->setViewRange(m_viewRadius * 2.1f);
-	m_camera->setProjectionType(GLCamera::ProjectionType::PERSPECTIVE);
+	m_camera->setViewRange(m_viewRadius * 2.1f);	
 	m_viewMatrix = m_camera->getViewMatrix();
 	m_projectionMatrix = m_camera->getProjectionMatrix();
 	glMatrixMode(GL_MODELVIEW);

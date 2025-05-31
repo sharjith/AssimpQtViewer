@@ -6,5 +6,7 @@
         <file>res/left.png</file>
         <file>res/top.png</file>
         <file>res/icon.png</file>
+        <file>res/Ortho.png</file>
+        <file>res/Perspective.png</file>
     </qresource>
 </RCC>
