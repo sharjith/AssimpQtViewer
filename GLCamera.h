@@ -126,10 +126,15 @@ public:
 	void setViewMatrix(QMatrix4x4 mat);
 	QMatrix4x4 getViewMatrix() const { return _viewMatrix; }
 
+	void computeStereoViewProjectionMatrices(int width, int height, float IOD, float depthZ, bool left_eye);
+
 	void setProjectionMatrix(QMatrix4x4 mat);
 	QMatrix4x4 getProjectionMatrix() const { return _projectionMatrix; }
 
 	void getRotationAngles(float* oPitch, float* oYaw, float* oRoll);
+
+	/*static QQuaternion quaternionFromMatrix(QMatrix4x4 m);
+	static void quatToEuler(const QQuaternion& quat, float *rotx,  float *roty, float *rotz);*/
 
 private:
 

@@ -111,6 +111,15 @@ void GLCamera::updateViewMatrix(void)
 
 	QQuaternion quat = QQuaternion::fromRotationMatrix(_viewMatrix.toGenericMatrix<3, 3>());
 	quat.getEulerAngles(&_rotatedY, &_rotatedZ, &_rotatedX);
+
+	/*
+	qDebug() << "=========================";
+	std::cout << std::fixed;
+	std::cout << "Rotated X " << std::setprecision(3) << _rotatedX << '\n';
+	std::cout << "Rotated Y " << std::setprecision(3) << _rotatedY << '\n';
+	std::cout << "Rotated Z " << std::setprecision(3) << _rotatedZ << '\n';
+	qDebug() << "=========================";
+	*/
 }
 
 void GLCamera::updateProjectionMatrix(void)
@@ -134,10 +143,27 @@ void GLCamera::updateProjectionMatrix(void)
 	}
 	else
 	{
-		float aspect = w / h;
-		float camnear = _viewRange * 0.01f;
-		float camfar = _viewRange * 1000.0f;
-		_projectionMatrix.perspective(_FOV, aspect, camnear, camfar);
+		// https://www.khronos.org/opengl/wiki/Viewing_and_Transformations#How_do_I_keep_my_aspect_ratio_correct_after_a_window_resize.3F
+		float aspectYScale = 1.0;
+		float conditionalAspect = 1.0f;
+		if (w / h < conditionalAspect)
+		{
+			aspectYScale *= w / h / conditionalAspect;
+		}
+		_projectionMatrix.perspective(atanf(tanf(_FOV * PI / 360.0) / aspectYScale) * 360.0 / PI
+			, w / h, 1.0f, _viewRange * 1000.0f);
+		// https://www.edmundoptics.com/knowledge-center/application-notes/imaging/understanding-focal-length-and-field-of-view
+		// Adjust camera translation according to FOV
+        //float radAngle = _FOV * PI / 180.0;
+        //float radHFOV = 2.0f * atanf(tanf(radAngle / 2.0f) * w / h);
+        //float HFOV = radHFOV * 180.0 / PI;
+		//float HFOV = h / w;// (w <= h) ? h / w : w / h;
+        //float AFOV = _FOV * PIdiv180;
+        //float wd = HFOV / (2.0f * tan(AFOV / 2.0f));
+		//qDebug() << "WD: " << wd;
+        //wd = wd + wd * 0.2f;
+		float shift = -_viewRange * 4;
+		_projectionMatrix.translate(0.0, 0.0, shift);
 	}
 }
 
@@ -308,6 +334,9 @@ void GLCamera::setView(ViewProjection iProj)
 
 	updateViewMatrix();
 
+	/*qDebug() << "Rotated X " << _rotatedX;
+	qDebug() << "Rotated Y " << _rotatedY;
+	qDebug() << "Rotated Z " << _rotatedZ;*/
 }
 
 void GLCamera::setView(QVector3D viewPos, QVector3D viewDir, QVector3D upDir, QVector3D rightDir)
@@ -358,3 +387,80 @@ void GLCamera::setProjectionMatrix(QMatrix4x4 mat)
 {
 	_projectionMatrix = mat;
 }
+
+void GLCamera::computeStereoViewProjectionMatrices(int width, int height, float IOD, float depthZ, bool left_eye)
+{
+	// https://hub.packtpub.com/rendering-stereoscopic-3d-models-using-opengl/
+	//mirror the parameters with the right eye
+	float left_right_direction = -1.0f;
+	if (left_eye)
+		left_right_direction = 1.0f;
+	float aspect_ratio = (float)width / (float)height;
+	float nearZ = 1.0f;
+	float farZ = _viewRange;
+	double frustumshift = (IOD / 2) * nearZ / depthZ;
+	float top = tan(_FOV / 2) * nearZ;
+	float right = aspect_ratio * top + frustumshift * left_right_direction;
+	//half screen
+	float left = -aspect_ratio * top + frustumshift * left_right_direction;
+	float bottom = -top;
+	_projectionMatrix.frustum(left, right, bottom, top, nearZ, farZ);
+	// update the view matrix
+	QVector3D viewPoint = _position + _viewDir;
+	_viewMatrix.lookAt(_position - _viewDir +
+		QVector3D(left_right_direction * IOD / 2, 0, 0),
+		//eye position
+		viewPoint +
+		QVector3D(left_right_direction * IOD / 2, 0, 0),
+		//centre position
+		_upVector //up direction
+	);
+}
+
+/*
+float sign(float num)
+{
+	return (num > 0) ? 1 : -1;
+}
+QQuaternion GLCamera::quaternionFromMatrix(QMatrix4x4 m)
+{
+	// Adapted from: http://www.euclideanspace.com/maths/geometry/rotations/conversions/matrixToQuaternion/index.htm
+
+	QVector4D v;
+	v.setW(sqrt(max(0.0, 1.0 + m(0, 0) + m(1, 1) + m(2, 2))) / 2);
+	v.setX(sqrt(max(0.0, 1.0 + m(0, 0) - m(1, 1) - m(2, 2))) / 2);
+	v.setY(sqrt(max(0.0, 1.0 - m(0, 0) + m(1, 1) - m(2, 2))) / 2);
+	v.setZ(sqrt(max(0.0, 1.0 - m(0, 0) - m(1, 1) + m(2, 2))) / 2);
+	v.setX(v.x() * sign(v.x() * (m(2, 1) - m(1, 2))));
+	v.setY(v.y() * sign(v.y() * (m(0, 2) - m(2, 0))));
+	v.setZ(v.z() * sign(v.z() * (m(1, 0) - m(0, 1))));
+	QQuaternion q(v);
+
+	return q;
+}
+
+void GLCamera::quatToEuler(const QQuaternion& quat, float *rotx, float *roty, float *rotz)
+{
+	float sqw;
+	float sqx;
+	float sqy;
+	float sqz;
+
+	float rotxrad;
+	float rotyrad;
+	float rotzrad;
+
+	sqw = quat.scalar() * quat.scalar();
+	sqx = quat.x() * quat.x();
+	sqy = quat.y() * quat.y();
+	sqz = quat.z() * quat.z();
+
+	rotxrad = (float)atan2l(2.0 * (quat.y() * quat.z() + quat.x() * quat.scalar()), (-sqx - sqy + sqz + sqw));
+	rotyrad = (float)asinl(-2.0 * (quat.x() * quat.z() - quat.y() * quat.scalar()));
+	rotzrad = (float)atan2l(2.0 * (quat.x() * quat.y() + quat.z() * quat.scalar()), (sqx - sqy - sqz + sqw));
+
+	*rotx = rotxrad * 180.0 / PI;
+	*roty = rotyrad * 180.0 / PI;
+	*rotz = rotzrad * 180.0 / PI;
+}
+*/

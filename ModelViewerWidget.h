@@ -6,9 +6,6 @@
 #include <QOpenGLWidget>
 #include <QString>
 #include <QToolButton>
-#include <QMatrix4x4>
-
-class GLCamera;
 
 enum class ViewProjection {
     Top,
@@ -73,8 +70,6 @@ private:
         float& outT
     );
     aiNode* findNodeForMesh(aiNode* node, int meshIndex);
-
-    QVector3D get3dTranslationVectorFromMousePoints(const QPoint& start, const QPoint& end);
     
     QToolButton* createViewButton(const QString& iconPath, const QString& tooltip, const std::function<void()>& callback, QWidget* parent = nullptr);
 
@@ -82,8 +77,6 @@ private:
     const aiScene* m_scene = nullptr;
     aiNode* m_highlightedNode = nullptr;
     Assimp::Importer m_importer;    
-
-	GLCamera* m_camera = nullptr; // Custom camera class for handling camera operations
 
     aiVector3D m_cameraPos;   // Current camera position
     aiVector3D m_viewCenter;  // Model center point
@@ -97,27 +90,25 @@ private:
     enum class InteractionMode { Select, Zoom, Rotate, Pan };
 
     QPoint m_lastMousePos;
-	QPoint m_totalMouseDelta;
+    float m_rotationX = 0.0f, m_rotationY = 0.0f;
+    float m_panX = 0.0f, m_panY = 0.0f;
+    float m_zoom = 1.0f;
+    float m_azimuth = -45.0f;     // Horizontal angle in degrees
+    float m_elevation = 35.0f;  // Vertical angle in degrees
     InteractionMode m_mode = InteractionMode::Select;
 
 	ViewProjection m_viewProjection = ViewProjection::Custom;
 
     QWidget* _viewToolbar;
 
+    float m_azimuthSpeed = 0.f;
+    float m_elevationSpeed = 0.f;
     bool m_isDragging = false;
-	aiNode* m_lastPickedNode = nullptr;
-    
+    QPointF m_panSpeed = { 0, 0 };
+    float m_zoomSpeed = 0.f;
     QTimer* m_inertiaTimer = nullptr;
-    QVector2D m_rotationVelocity;
-    QVector3D m_panVelocity;
-    float m_zoomVelocity = 0.0f;
-	float m_inertiaFactor = 0.95f; // Factor to reduce velocity each frame
-    bool m_inertiaActive = false;
+	aiNode* m_lastPickedNode = nullptr;
         
     std::unordered_map<unsigned int, GLuint> m_materialTextureCache;
 	QString m_lastModelPath;
-
-	QMatrix4x4 m_viewMatrix;
-    QMatrix4x4 m_modelMatrix; // Model matrix for transformations
-    QMatrix4x4 m_projectionMatrix;       
 };
