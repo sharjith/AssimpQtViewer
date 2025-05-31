@@ -110,9 +110,7 @@ public:
 	void move(float iDX, float iDY, float iDZ);
 	void moveForward(float iDist);
 	void moveUpward(float iDist);
-	void moveAcross(float iDist);
-	void setZoom(float iFactor);
-	float getZoom() const { return _zoomValue; }
+	void moveAcross(float iDist);	
 	void setView(ViewProjection iProj);
 	void setView(QVector3D viewPos, QVector3D viewDir, QVector3D upDir, QVector3D rightDir);
 	void setPosition(float iX, float iY, float iZ);
@@ -142,7 +140,7 @@ private:
 	float _height;
 	float _viewRange;
 	float _FOV;
-	float _rotatedX, _rotatedY, _rotatedZ, _zoomValue;
+	float _rotatedX, _rotatedY, _rotatedZ;
 	ViewProjection _viewProj;
 	ProjectionType _projectionType;
 

@@ -91,7 +91,6 @@ void GLCamera::resetAll(void)
 
 	//Only to be sure:
 	_rotatedX = _rotatedY = _rotatedZ = 0.0;
-	_zoomValue = 1.0;
 
 	_viewMatrix.setToIdentity();
 	updateViewMatrix();
@@ -105,9 +104,6 @@ void GLCamera::updateViewMatrix(void)
 
 	//as we know the up vector, we can easily use gluLookAt:
 	_viewMatrix.lookAt(_position, viewPoint, _upVector);
-
-	// Camera Zooming
-	_viewMatrix.scale(_zoomValue);
 
 	QQuaternion quat = QQuaternion::fromRotationMatrix(_viewMatrix.toGenericMatrix<3, 3>());
 	quat.getEulerAngles(&_rotatedY, &_rotatedZ, &_rotatedX);
@@ -136,7 +132,7 @@ void GLCamera::updateProjectionMatrix(void)
 	{
 		float aspect = w / h;
 		float camnear = _viewRange * 0.01f;
-		float camfar = _viewRange * 1000.0f;
+		float camfar = _viewRange * 10000.0f;
 		_projectionMatrix.perspective(_FOV, aspect, camnear, camfar);
 	}
 }
@@ -217,12 +213,6 @@ void GLCamera::moveUpward(float iDist)
 void GLCamera::moveAcross(float iDist)
 {
 	_position = _position + (_rightVector * iDist);
-	updateViewMatrix();
-}
-
-void GLCamera::setZoom(float iFactor)
-{
-	_zoomValue = iFactor;
 	updateViewMatrix();
 }
 
