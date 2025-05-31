@@ -589,12 +589,9 @@ void ModelViewerWidget::mouseReleaseEvent(QMouseEvent* event)
 	m_isDragging = false;
 	
 	int movementThreshold = 1; // Keep low for now
-
-	qDebug() << "Mouse delta length:" << m_totalMouseDelta.manhattanLength();
-
-	if (m_totalMouseDelta.manhattanLength() > movementThreshold) {
-		qDebug() << "Starting inertia with velocity:"
-			<< m_panVelocity << m_zoomVelocity << m_rotationVelocity;
+	
+	if (m_totalMouseDelta.manhattanLength() > movementThreshold) 
+	{			
 		if (!m_inertiaTimer->isActive())
 		{
 			m_inertiaTimer->start(16); // 60 fps
@@ -602,8 +599,7 @@ void ModelViewerWidget::mouseReleaseEvent(QMouseEvent* event)
 		}
 	}
 	else {
-		// No real movement — don't start inertia
-		qDebug() << "No significant movement, stopping inertia timer.";
+		// No real movement — don't start inertia		
 		m_panVelocity = QVector3D(0, 0, 0);
 		m_zoomVelocity = 0.0f;
 		m_rotationVelocity = QVector2D(0, 0);
@@ -611,7 +607,8 @@ void ModelViewerWidget::mouseReleaseEvent(QMouseEvent* event)
 	}
 
 	Q_UNUSED(event);
-	m_mode = InteractionMode::Select;
+	if (!(event->modifiers() & Qt::ControlModifier))
+		m_mode = InteractionMode::Select;
 }
 
 void ModelViewerWidget::wheelEvent(QWheelEvent* event)
@@ -751,8 +748,8 @@ void ModelViewerWidget::fitToView() {
 
 void ModelViewerWidget::onInertiaTimeout() 
 {
-	qDebug() << "Inertia timer triggered. Current velocities:"
-		<< m_panVelocity << m_zoomVelocity << m_rotationVelocity;
+	if(m_mode == InteractionMode::Select)
+		return; // Don't apply inertia while selecting
 	if (!m_inertiaActive)
 		return;
 
