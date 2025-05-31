@@ -8,5 +8,8 @@
         <file>res/icon.png</file>
         <file>res/Ortho.png</file>
         <file>res/Perspective.png</file>
+        <file>res/back.png</file>
+        <file>res/bottom.png</file>
+        <file>res/right.png</file>
     </qresource>
 </RCC>

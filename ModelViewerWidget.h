@@ -63,6 +63,9 @@ private:
     void setViewTop();
     void setViewFront();
     void setViewLeft();
+    void setViewBottom();
+    void setViewRear();
+    void setViewRight();
     void setViewAxonometric();    
     void fitToView();
     void pickAtScreenPosition(const QPoint& pos);

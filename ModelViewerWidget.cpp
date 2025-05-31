@@ -55,6 +55,9 @@ ModelViewerWidget::ModelViewerWidget(QWidget* parent)
 	layout->addWidget(createViewButton(":/icons/res/top.png", "Top View", [this]() { setViewTop(); }, _viewToolbar));
 	layout->addWidget(createViewButton(":/icons/res/front.png", "Front View", [this]() { setViewFront(); }, _viewToolbar));
 	layout->addWidget(createViewButton(":/icons/res/left.png", "Left View", [this]() { setViewLeft(); }, _viewToolbar));
+	layout->addWidget(createViewButton(":/icons/res/bottom.png", "Bottom View", [this]() { setViewBottom(); }, _viewToolbar));
+	layout->addWidget(createViewButton(":/icons/res/back.png", "Rear View", [this]() { setViewRear(); }, _viewToolbar));
+	layout->addWidget(createViewButton(":/icons/res/right.png", "Right View", [this]() { setViewRight(); }, _viewToolbar));
 	layout->addWidget(createViewButton(":/icons/res/isometric.png", "Isometric View", [this]() { setViewAxonometric(); }, _viewToolbar));
 	layout->addWidget(createViewButton(":/icons/res/fit-all.png", "Fit All", [this]() { fitToView(); }, _viewToolbar));
 
@@ -756,10 +759,26 @@ void ModelViewerWidget::setViewLeft() {
 	update();
 }
 
+void ModelViewerWidget::setViewBottom() {
+	m_camera->setView(GLCamera::ViewProjection::BOTTOM_VIEW);
+	update();
+}
+
+void ModelViewerWidget::setViewRear() {
+	m_camera->setView(GLCamera::ViewProjection::REAR_VIEW);
+	update();
+}
+
+void ModelViewerWidget::setViewRight() {
+	m_camera->setView(GLCamera::ViewProjection::RIGHT_VIEW);
+	update();
+}
+
 void ModelViewerWidget::setViewAxonometric() {
 	m_camera->setView(GLCamera::ViewProjection::SE_ISOMETRIC_VIEW);
 	update();
 }
+
 
 void ModelViewerWidget::fitToView() {
 	// Optional: adjust _cameraDistance or zoom to fit model bounds
