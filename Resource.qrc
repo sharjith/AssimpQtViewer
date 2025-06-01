@@ -11,5 +11,8 @@
         <file>res/back.png</file>
         <file>res/bottom.png</file>
         <file>res/right.png</file>
+        <file>res/pancursor.png</file>
+        <file>res/rotatecursor.png</file>
+        <file>res/zoomcursor.png</file>
     </qresource>
 </RCC>

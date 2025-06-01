@@ -558,6 +558,8 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
 
 	if (m_mode == InteractionMode::Rotate) {
 
+		setCursor(QCursor(QPixmap(":/icons/res/rotatecursor.png")));
+
 		QPoint rotate = m_lastMousePos - downPoint;
 
 		m_camera->rotateX(rotate.y() / 2.0);
@@ -568,6 +570,8 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
 		m_inertiaActive = false; // Stop inertia while dragging
 	}
 	else if (m_mode == InteractionMode::Pan) {
+
+		setCursor(QCursor(QPixmap(":/icons/res/pancursor.png")));
 
 		// Pan speed scaled by distance
 		float panSpeed = m_cameraDistance * 0.001f;
@@ -581,6 +585,9 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
 				
 	}
 	else if (m_mode == InteractionMode::Zoom) {
+
+		setCursor(QCursor(QPixmap(":/icons/res/zoomcursor.png")));
+
 		float zoomDelta = delta.y() * 0.01f;
 
 		if (downPoint.x() > m_lastMousePos.x() || downPoint.y() < m_lastMousePos.y())
@@ -610,6 +617,8 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
 
 void ModelViewerWidget::mouseReleaseEvent(QMouseEvent* event)
 {
+	setCursor(QCursor(Qt::ArrowCursor));
+
 	m_isDragging = false;
 	
 	int movementThreshold = 1; // Keep low for now
