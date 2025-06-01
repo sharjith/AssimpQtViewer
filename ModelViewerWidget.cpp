@@ -283,7 +283,7 @@ void ModelViewerWidget::drawTrihedron(float axisLength, float axisRadius, float 
 	glDisable(GL_LIGHTING);
 
 	// Draw center sphere
-	glColor3f(0.8f, 0.8f, 0.8f);
+	glColor3f(0.8f, 0.8f, 0.0f);
 	gluSphere(quad, sphereRadius, 16, 16);
 
 	// ===== X Axis (Red) =====
@@ -330,7 +330,19 @@ void ModelViewerWidget::drawTrihedronOverlay() {
 	glMatrixMode(GL_PROJECTION);
 	glPushMatrix();
 	glLoadIdentity();
-	gluPerspective(30.0, 1.0, 0.1, 10.0); // Narrow FOV
+
+
+	if (m_camera->getProjectionType() == GLCamera::ProjectionType::PERSPECTIVE) {
+		// Narrow FOV for better appearance in small viewport
+		gluPerspective(30.0, 1.0, 0.1, 10.0);
+		glScalef(1.0f, 1.0f, 1.0f); // Scale to normal size
+	}
+	else {
+		// Orthographic projection for overlay
+		float orthoSize = 1.5f;
+		glOrtho(-orthoSize, orthoSize, -orthoSize, orthoSize, 0.1, 10.0);
+		glScalef(1.25f, 1.25f, 1.25f); // Scale to fit viewport
+	}
 
 	glMatrixMode(GL_MODELVIEW);
 	glPushMatrix();
