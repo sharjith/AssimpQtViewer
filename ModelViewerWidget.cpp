@@ -597,7 +597,7 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
 
 		// Store velocity
 		m_zoomVelocity = sign * 0.10f;
-		m_panVelocity = OP;
+		m_zoomPanVelocity = OP;
 		m_inertiaActive = false;
 
 		resizeGL(width(), height());
@@ -625,6 +625,7 @@ void ModelViewerWidget::mouseReleaseEvent(QMouseEvent* event)
 	else {
 		// No real movement — don't start inertia		
 		m_panVelocity = QVector3D(0, 0, 0);
+		m_zoomPanVelocity = QVector3D(0, 0, 0);	
 		m_zoomVelocity = 0.0f;
 		m_rotationVelocity = QVector2D(0, 0);
 		m_inertiaTimer->stop();
@@ -643,7 +644,7 @@ void ModelViewerWidget::wheelEvent(QWheelEvent* event)
 		if (!m_inertiaTimer->isActive())
 			m_inertiaTimer->start(16);
 
-		QPoint numSteps = numDegrees / 15;
+		QPoint numSteps = numDegrees / 30;
 		float zoomStep = numSteps.y();
 		float zoomFactor = abs(zoomStep) + 0.05;
 
@@ -661,8 +662,8 @@ void ModelViewerWidget::wheelEvent(QWheelEvent* event)
 		m_camera->move(OP.x(), OP.y(), OP.z());
 
 		// Add to velocities instead of overriding
-		m_zoomVelocity += sign * 1.0f; // Tune factor
-		m_panVelocity += OP * sign * 0.05f;
+		m_zoomVelocity += sign * 0.1f; // Tune factor
+		m_zoomPanVelocity += OP * sign * 0.05f;
 		
 	}
 	resizeGL(width(), height());
@@ -848,7 +849,7 @@ void ModelViewerWidget::onInertiaTimeout()
 		// Zoom-centric pan
 		QPoint cen = rect().center();
 		QVector3D OP = get3dTranslationVectorFromMousePoints(cen, cen);
-		OP *= -m_zoomVelocity * 0.05f;
+		OP *= -m_zoomPanVelocity * 0.05f;
 		m_camera->move(OP.x(), OP.y(), OP.z());
 
 		m_zoomVelocity *= m_inertiaFactor * 0.75f;

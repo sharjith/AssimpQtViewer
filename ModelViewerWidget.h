@@ -116,6 +116,7 @@ private:
     QTimer* m_inertiaTimer = nullptr;
     QVector2D m_rotationVelocity;
     QVector3D m_panVelocity;
+    QVector3D m_zoomPanVelocity;
     float m_zoomVelocity = 0.0f;
 	float m_inertiaFactor = 0.75f; // Factor to reduce velocity each frame
     bool m_inertiaActive = false;
