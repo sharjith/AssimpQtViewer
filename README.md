@@ -64,10 +64,9 @@ ModelViewer/
 │   ├── MainWindow.cpp/.h
 │   ├── ModelViewerWidget.cpp/.h
 │   ├── GLCamera.cpp/.h
-│   ├── Trihedron.cpp/.h
-├── shaders/
-├── resources/
-│   └── icons/
+│   ├── HighlightDelegate.cpp/.h
+├── res/
+│   └── icons images/
 ├── CMakeLists.txt
 └── README.md
 ```
