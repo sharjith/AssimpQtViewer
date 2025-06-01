@@ -91,6 +91,8 @@ MainWindow::MainWindow(QWidget* parent)
 	connect(m_viewerWidget, &ModelViewerWidget::nodePicked,
 		this, &MainWindow::selectTreeNodeFor);
 
+	setAcceptDrops(true);
+
 }
 
 void MainWindow::loadModel(const QString& path) {
@@ -220,3 +222,26 @@ void MainWindow::selectTreeNodeFor(aiNode* node) {
 	}
 }
 
+void MainWindow::dragEnterEvent(QDragEnterEvent* event)
+{
+	if (event->mimeData()->hasUrls()) {
+		QList<QUrl> urlList = event->mimeData()->urls();
+		if (!urlList.isEmpty() && urlList.first().isLocalFile()) {
+			event->acceptProposedAction();
+		}
+	}
+}
+
+void MainWindow::dropEvent(QDropEvent* event)
+{
+	const QMimeData* mimeData = event->mimeData();
+	if (mimeData->hasUrls()) {
+		QList<QUrl> urlList = mimeData->urls();
+		if (!urlList.isEmpty()) {
+			QString filePath = urlList.first().toLocalFile();
+			if (!filePath.isEmpty()) {
+				loadModel(filePath); // Your model loading function
+			}
+		}
+	}
+}

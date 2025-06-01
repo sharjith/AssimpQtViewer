@@ -5,6 +5,8 @@
 #include <QMainWindow>
 #include <QProgressBar>
 #include <QTreeWidget>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 
 class MainWindow : public QMainWindow {
     Q_OBJECT
@@ -20,6 +22,10 @@ private:
     void loadModel(const QString& path);    
     void setProgressValue(const int& value);
     void populateTree(const aiScene* scene);
+
+protected:
+    void dragEnterEvent(QDragEnterEvent* event) override;
+    void dropEvent(QDropEvent* event) override;
     
 private:
     ModelViewerWidget* m_viewerWidget;
