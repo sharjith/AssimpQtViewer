@@ -14,6 +14,9 @@ enum class ViewProjection {
     Top,
     Front,
     Left,
+	Bottom,
+	Rear,
+	Right,
     Axonometric,
     Custom
 };

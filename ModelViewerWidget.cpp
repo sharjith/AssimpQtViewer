@@ -670,24 +670,34 @@ void ModelViewerWidget::wheelEvent(QWheelEvent* event)
 }
 
 void ModelViewerWidget::keyPressEvent(QKeyEvent* event) {
-	switch (event->key()) {
-	case Qt::Key_T:  // Top view (looking down -Y axis)
-		setViewProjection(ViewProjection::Top);
-		break;
-	case Qt::Key_F:  // Front view (looking along +Z)
-		setViewProjection(ViewProjection::Front);
-		break;
-	case Qt::Key_L:  // Left view (looking along -X)
-		setViewProjection(ViewProjection::Left);
-		break;
-	case Qt::Key_A:  // Axonometric (isometric) view
-		setViewProjection(ViewProjection::Axonometric);
-		break;
-	case Qt::Key_H:  // Home / Fit all
-		updateCamera();
-		break;
+	if (event->modifiers() & Qt::ControlModifier) {
+		if (event->key() == Qt::Key_T) {
+			setViewProjection(ViewProjection::Top);
+		}
+		else if (event->key() == Qt::Key_F) {
+			setViewProjection(ViewProjection::Front);
+		}
+		else if (event->key() == Qt::Key_L) {
+			setViewProjection(ViewProjection::Left);
+		}
+		if (event->key() == Qt::Key_B) {
+			setViewProjection(ViewProjection::Bottom);
+		}
+		else if (event->key() == Qt::Key_R) {
+			setViewProjection(ViewProjection::Rear);
+		}
+		else if (event->key() == Qt::Key_J) {
+			setViewProjection(ViewProjection::Right);
+		}
+		else if (event->key() == Qt::Key_A) {
+			setViewProjection(ViewProjection::Axonometric);
+		}
 	}
-	update();
+	else {
+		if (event->key() == Qt::Key_Home) {
+			updateCamera();
+		}
+	}
 }
 
 void ModelViewerWidget::resizeEvent(QResizeEvent* event) {
@@ -728,6 +738,15 @@ void ModelViewerWidget::setViewProjection(ViewProjection view)
 		break;
 	case ViewProjection::Left:
 		setViewLeft();
+		break;
+	case ViewProjection::Bottom:
+		setViewBottom();
+		break;
+	case ViewProjection::Rear:	
+		setViewRear();
+		break;	
+	case ViewProjection::Right:
+		setViewRight();
 		break;
 	case ViewProjection::Axonometric:
 		setViewAxonometric();
