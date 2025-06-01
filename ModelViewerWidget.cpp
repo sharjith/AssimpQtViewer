@@ -623,7 +623,7 @@ void ModelViewerWidget::mouseReleaseEvent(QMouseEvent* event)
 		}
 	}
 	else {
-		// No real movement — don't start inertia		
+		// No real movement ? don't start inertia		
 		m_panVelocity = QVector3D(0, 0, 0);
 		m_zoomVelocity = 0.0f;
 		m_rotationVelocity = QVector2D(0, 0);
