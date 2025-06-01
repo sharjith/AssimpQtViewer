@@ -696,8 +696,9 @@ void ModelViewerWidget::keyPressEvent(QKeyEvent* event) {
 	else {
 		if (event->key() == Qt::Key_Home) {
 			updateCamera();
+			update();
 		}
-	}
+	}	
 }
 
 void ModelViewerWidget::resizeEvent(QResizeEvent* event) {
@@ -818,7 +819,7 @@ void ModelViewerWidget::onInertiaTimeout()
 	if (!m_rotationVelocity.isNull()) {
 		m_camera->rotateX(-m_rotationVelocity.y());
 		m_camera->rotateY(-m_rotationVelocity.x());
-		m_rotationVelocity *= 0.90f;
+		m_rotationVelocity *= m_inertiaFactor;
 		if (m_rotationVelocity.length() > 0.01f)
 			stillActive = true;
 		else
@@ -828,7 +829,7 @@ void ModelViewerWidget::onInertiaTimeout()
 	// Apply pan inertia
 	if (!m_panVelocity.isNull()) {
 		m_camera->move(m_panVelocity.x(), m_panVelocity.y(), m_panVelocity.z());
-		m_panVelocity *= 0.90f;
+		m_panVelocity *= m_inertiaFactor;
 		if (m_panVelocity.length() > 0.0001f)
 			stillActive = true;
 		else
@@ -850,7 +851,7 @@ void ModelViewerWidget::onInertiaTimeout()
 		OP *= -m_zoomVelocity * 0.05f;
 		m_camera->move(OP.x(), OP.y(), OP.z());
 
-		m_zoomVelocity *= 0.75f;
+		m_zoomVelocity *= m_inertiaFactor * 0.75f;
 		if (std::abs(m_zoomVelocity) > 0.001f)
 			stillActive = true;
 		else
