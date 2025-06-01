@@ -240,7 +240,7 @@ void MainWindow::dropEvent(QDropEvent* event)
 		if (!urlList.isEmpty()) {
 			QString filePath = urlList.first().toLocalFile();
 			if (!filePath.isEmpty()) {
-				loadModel(filePath); // Your model loading function
+				loadModel(filePath); 
 			}
 		}
 	}
