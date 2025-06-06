@@ -3,6 +3,8 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <QOpenGLFunctions>
+#include <QOpenGLFunctions_3_3_Core>
+#include <QOpenGLExtraFunctions>
 #include <QOpenGLWidget>
 #include <QString>
 #include <QToolButton>
@@ -21,7 +23,27 @@ enum class ViewProjection {
     Custom
 };
 
-class ModelViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions {
+struct ModernMesh {
+    GLuint vao = 0;
+    GLuint vbo = 0;
+    GLuint ebo = 0;
+    std::vector<float> vertexData;
+    std::vector<unsigned int> indices;
+    int indexCount = 0;
+    int materialIndex = 0;
+    QString name;
+    QVector4D color;
+};
+
+struct ModernSceneNode {
+    QString name;
+    QMatrix4x4 transform;
+    std::vector<int> meshIndices; // Indices into a ModernMesh vector
+    std::vector<ModernSceneNode> children;
+};
+
+
+class ModelViewerWidget : public QOpenGLWidget, protected QOpenGLExtraFunctions {
     Q_OBJECT
 public:
     explicit ModelViewerWidget(QWidget *parent = nullptr);
@@ -84,6 +106,10 @@ private:
     
     QToolButton* createViewButton(const QString& iconPath, const QString& tooltip, const std::function<void()>& callback, QWidget* parent = nullptr);
 
+
+    GLuint compileShader(GLenum type, const char* src);
+    GLuint createProgram(const char* vsrc, const char* fsrc);
+
 private:
     const aiScene* m_scene = nullptr;
     aiNode* m_highlightedNode = nullptr;
@@ -126,5 +152,15 @@ private:
 
 	QMatrix4x4 m_viewMatrix;
     QMatrix4x4 m_modelMatrix; // Model matrix for transformations
-    QMatrix4x4 m_projectionMatrix;       
+    QMatrix4x4 m_projectionMatrix;     
+
+
+    GLuint m_meshShaderProgram = 0;
+    GLuint m_testShaderProgram = 0;
+    GLuint m_testVao = 0, m_testVbo = 0;
+
+    GLuint testMeshVAO = 0, testMeshVBO = 0, testMeshEBO = 0;
+
+    std::vector<ModernMesh> m_modernMeshes;
+    ModernSceneNode m_modernRootNode;
 };

@@ -18,7 +18,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
-#include <GL/gl.h>
+//#include <GL/gl.h>
 #include <GL/glu.h>
 
 #include <algorithm>
@@ -29,7 +29,8 @@ ModelViewerWidget::ModelViewerWidget(QWidget* parent)
 	QSurfaceFormat fmt;
 	fmt.setDepthBufferSize(24);
 	fmt.setVersion(3, 3);
-	fmt.setProfile(QSurfaceFormat::CompatibilityProfile);
+	fmt.setProfile(QSurfaceFormat::CoreProfile);
+	fmt.setOption(QSurfaceFormat::DebugContext);
 	QSurfaceFormat::setDefaultFormat(fmt);
 
 	m_modelMatrix.setToIdentity();
@@ -98,89 +99,330 @@ QToolButton* ModelViewerWidget::createViewButton(const QString& iconPath, const 
 	return button;
 }
 
+GLuint ModelViewerWidget::compileShader(GLenum type, const char* src) {
+	GLuint shader = glCreateShader(type);
+	glShaderSource(shader, 1, &src, nullptr);
+	glCompileShader(shader);
+	GLint status;
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
+	if (!status) {
+		char log[512];
+		glGetShaderInfoLog(shader, 512, nullptr, log);
+		qDebug() << "Shader compile error:" << log;
+		glDeleteShader(shader);
+		return 0;
+	}
+	return shader;
+}
+
+GLuint ModelViewerWidget::createProgram(const char* vsrc, const char* fsrc) {
+	GLuint vs = compileShader(GL_VERTEX_SHADER, vsrc);
+	GLuint fs = compileShader(GL_FRAGMENT_SHADER, fsrc);
+	GLuint prog = glCreateProgram();
+	glAttachShader(prog, vs);
+	glAttachShader(prog, fs);
+	glLinkProgram(prog);
+	glDeleteShader(vs);
+	glDeleteShader(fs);
+	GLint status;
+	glGetProgramiv(prog, GL_LINK_STATUS, &status);
+	if (!status) {
+		char log[512];
+		glGetProgramInfoLog(prog, 512, nullptr, log);
+		qDebug() << "Program link error:" << log;
+		glDeleteProgram(prog);
+		return 0;
+	}
+	return prog;
+}
 
 void ModelViewerWidget::initializeGL() {
 	initializeOpenGLFunctions();
+	
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_COLOR_MATERIAL);
-
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_LIGHTING);
-	glEnable(GL_LIGHT0);
-	glEnable(GL_NORMALIZE); // Normalize normals for non-uniform scaling
-	glEnable(GL_COLOR_MATERIAL);
-
-	glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE);
-
-	// Set light position and color
-	GLfloat lightPos[] = { 0.0f, 0.0f, m_viewRadius, 0.0f };
-	glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
-
-	GLfloat lightColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-	glLightfv(GL_LIGHT0, GL_DIFFUSE, lightColor);
-	glLightfv(GL_LIGHT0, GL_SPECULAR, lightColor);
-
-	GLfloat materialAmbient[] = { 0.2f, 0.2f, 0.2f, 1.0f };
-	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, materialAmbient);
-
-	// Set specular material color
-	GLfloat materialSpecular[] = { 0.5f, 0.5f, 0.5f, 1.0f };
-	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, materialSpecular);
-
-	// Set shininess (range: 0 to 128; higher = smaller, sharper highlight)
-	GLfloat shininess = 64.0f;
-	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, shininess);
-
-	glShadeModel(GL_SMOOTH);
-	glEnable(GL_NORMALIZE); // Normalize normals for non-uniform scaling
-
+	
 	m_camera = new GLCamera(height(), width(), m_viewRadius, 45);
 	m_camera->setProjectionType(GLCamera::ProjectionType::PERSPECTIVE);
 	m_camera->setView(GLCamera::ViewProjection::SE_ISOMETRIC_VIEW);
+
+	if (!m_scene) {
+		// Set up a default camera view for the test triangle
+		m_camera->setPosition(QVector3D(0, 0, 2));
+		m_camera->setPosition(QVector3D(0, 0, 0));
+		//m_camera->setUpVector(QVector3D(0, 1, 0));
+		m_camera->setViewRange(2.0f);
+		m_camera->setProjectionType(GLCamera::ProjectionType::PERSPECTIVE);
+	}
+
+	
+	// Load shader sources (for demo, you can hardcode or load from file)
+	const char* vsrc =
+		"#version 330 core\n"
+		"layout(location = 0) in vec3 position;\n"
+		"uniform mat4 mvp;\n"
+		"void main() { gl_Position = mvp * vec4(position, 1.0); }\n";
+	const char* fsrc =
+		"#version 330 core\n"
+		"uniform vec4 color;"
+		"out vec4 fragColor;\n"
+		"void main() { fragColor = color; }\n";
+	m_testShaderProgram = createProgram(vsrc, fsrc);
+
+	const char* meshVSrc =
+		"#version 330 core\n"
+		"layout(location = 0) in vec3 position;\n"
+		"layout(location = 1) in vec3 normal;\n"
+		"layout(location = 2) in vec2 texcoord;\n"
+		"uniform mat4 mvp;\n"
+		"void main() {\n"
+		"	gl_Position = mvp * vec4(position, 1.0);\n"
+		"}\n";
+
+	m_meshShaderProgram = createProgram(meshVSrc, fsrc);
+
+	/*
+	// Create a test triangle
+	float vertices[] = {
+		0.0f,  0.5f, 0.0f,
+	   -0.5f, -0.5f, 0.0f,
+		0.5f, -0.5f, 0.0f
+	};
+	glGenVertexArrays(1, &m_testVao);
+	glGenBuffers(1, &m_testVbo);
+	glBindVertexArray(m_testVao);
+	glBindBuffer(GL_ARRAY_BUFFER, m_testVbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glBindVertexArray(0);
+
+	// Minimal mesh test: create a VAO/VBO/EBO for a single triangle
+	float meshVertices[] = {
+		0.0f,  0.5f, 0.0f,
+	   -0.5f, -0.5f, 0.0f,
+		0.5f, -0.5f, 0.0f
+	};
+	GLushort meshIndices[] = { 0, 1, 2 };
+
+
+	glGenVertexArrays(1, &testMeshVAO);
+	glGenBuffers(1, &testMeshVBO);
+	glGenBuffers(1, &testMeshEBO);
+
+	glBindVertexArray(testMeshVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, testMeshVBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(meshVertices), meshVertices, GL_STATIC_DRAW);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, testMeshEBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(meshIndices), meshIndices, GL_STATIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glBindVertexArray(0);
+	*/
 }
 
 void ModelViewerWidget::resizeGL(int w, int h) {
 	glViewport(0, 0, w, h);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
+	//glMatrixMode(GL_PROJECTION);
+	//glLoadIdentity();
 
 	if (h == 0) h = 1; // Prevent division by zero
 
-	m_camera->setScreenSize(w, h);
-	m_camera->setViewRange(m_viewRadius * 2.1f);	
-	m_viewMatrix = m_camera->getViewMatrix();
-	m_projectionMatrix = m_camera->getProjectionMatrix();
-	glMatrixMode(GL_MODELVIEW);
+	if (m_camera) {
+		m_camera->setScreenSize(w, h);
+		m_camera->setViewRange(m_viewRadius * 2.1f);
+		m_viewMatrix = m_camera->getViewMatrix();
+		m_projectionMatrix = m_camera->getProjectionMatrix();
+	}
+	else {
+		// Fallback for when no model/camera is set up
+		m_viewMatrix.setToIdentity();
+		m_viewMatrix.lookAt(QVector3D(0, 0, 2), QVector3D(0, 0, 0), QVector3D(0, 1, 0));
+		m_projectionMatrix.setToIdentity();
+		m_projectionMatrix.perspective(45.0f, float(w) / float(h), 0.1f, 10.0f);
+	}
+
 }
 
-void ModelViewerWidget::paintGL() {
+//void ModelViewerWidget::paintGL() {
+//	
+//	glViewport(0, 0, width(), height());
+//	glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+//	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+//
+//	// --- Legacy OpenGL code first ---
+//	drawGradientBackground();
+//
+//	m_viewMatrix.setToIdentity();
+//	m_viewMatrix = m_camera->getViewMatrix();
+//	m_projectionMatrix = m_camera->getProjectionMatrix();
+//
+//	glMatrixMode(GL_PROJECTION);
+//	glLoadIdentity();
+//	glLoadMatrixf(m_projectionMatrix.constData());
+//
+//	glMatrixMode(GL_MODELVIEW);
+//	glLoadIdentity();
+//
+//	QMatrix4x4 modelViewMatrix = m_viewMatrix * m_modelMatrix;
+//	glLoadMatrixf(modelViewMatrix.constData());
+//
+//	if (m_scene && m_scene->mRootNode)
+//		drawNode(m_scene->mRootNode);
+//
+//	drawTrihedronOverlay();
+//
+//	// --- Now draw the modern OpenGL test triangle LAST ---
+//	// Reset state for modern OpenGL
+//	glUseProgram(m_testShaderProgram);
+//	glBindVertexArray(m_testVao);
+//
+//	// Set viewport and depth state again, in case legacy code changed it
+//	glViewport(0, 0, width(), height());
+//	glEnable(GL_DEPTH_TEST);
+//	glDepthFunc(GL_LESS);
+//
+//	// Use a simple MVP
+//	QMatrix4x4 mvp;
+//	mvp.perspective(45.0f, float(width()) / height(), 0.1f, 10.0f);
+//	mvp.translate(0, 0, -2);
+//	GLint mvpLoc = glGetUniformLocation(m_testShaderProgram, "mvp");
+//	glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp.constData());
+//
+//	glDrawArrays(GL_TRIANGLES, 0, 3);
+//
+//	glBindVertexArray(0);
+//	glUseProgram(0);
+//}
 
+void ModelViewerWidget::paintGL() {
+	glViewport(0, 0, width(), height());
 	glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	drawGradientBackground();
 
-	m_viewMatrix.setToIdentity();
 	m_viewMatrix = m_camera->getViewMatrix();
 	m_projectionMatrix = m_camera->getProjectionMatrix();
 
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	glLoadMatrixf(m_projectionMatrix.constData());
+	if (!m_modernMeshes.empty()) {
 
-	glMatrixMode(GL_MODELVIEW);
-	glLoadIdentity();
+
+		for (ModernMesh& modernMesh : m_modernMeshes) {
+			if (modernMesh.vao == 0) {
+				// OpenGL upload
+				glGenVertexArrays(1, &modernMesh.vao);
+				glBindVertexArray(modernMesh.vao);
+
+				glGenBuffers(1, &modernMesh.vbo);
+				glBindBuffer(GL_ARRAY_BUFFER, modernMesh.vbo);
+				glBufferData(GL_ARRAY_BUFFER, modernMesh.vertexData.size() * sizeof(float), modernMesh.vertexData.data(), GL_STATIC_DRAW);
+
+				glGenBuffers(1, &modernMesh.ebo);
+				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modernMesh.ebo);
+				glBufferData(GL_ELEMENT_ARRAY_BUFFER, modernMesh.indices.size() * sizeof(unsigned int), modernMesh.indices.data(), GL_STATIC_DRAW);
+
+				GLint eboCheck = 0;
+				glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &eboCheck);
+				qDebug() << "After VAO setup: VAO" << modernMesh.vao << "EBO" << modernMesh.ebo << "EBO bound:" << eboCheck;
+
+				GLenum err = glGetError();
+				if (err != GL_NO_ERROR) {
+					qDebug() << "OpenGL error after EBO upload:" << err;
+				}
+
+				// Attribute layout: pos(3), normal(3), texcoord(2)
+				int stride = 8 * sizeof(float);
+				glEnableVertexAttribArray(0); // position
+				glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
+				glEnableVertexAttribArray(1); // normal
+				glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+				glEnableVertexAttribArray(2); // texcoord
+				glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+
+				glBindVertexArray(0);
+
+				err = glGetError();
+				if (err != GL_NO_ERROR) {
+					qDebug() << "OpenGL error after VAO/VBO setup:" << err;
+				}
+			}
+		}
+
+		glUseProgram(m_meshShaderProgram);
+		GLint mvpLoc = glGetUniformLocation(m_meshShaderProgram, "mvp");
 		
-	QMatrix4x4 modelViewMatrix = m_viewMatrix * m_modelMatrix;
-	glLoadMatrixf(modelViewMatrix.constData());
+		std::function<void(const ModernSceneNode&, QMatrix4x4)> drawNodeModern;
+		drawNodeModern = [&](const ModernSceneNode& node, QMatrix4x4 parentTransform) {
+			QMatrix4x4 globalTransform = parentTransform * node.transform;
+			QMatrix4x4 mvp = m_projectionMatrix * m_viewMatrix * globalTransform;
+			for (int meshIdx : node.meshIndices) {
+				if (meshIdx < 0 || meshIdx >= int(m_modernMeshes.size())) continue;
+				const ModernMesh& mesh = m_modernMeshes[meshIdx];
+				if (mesh.vao == 0 || mesh.indexCount == 0) continue;
 
-	if (m_scene) {
+				GLint colorLoc = glGetUniformLocation(m_meshShaderProgram, "color");
+				float color[4] = { mesh.color.x(), mesh.color.y(), mesh.color.z(), mesh.color.w() };
+				glUniform4fv(colorLoc, 1, color);
 
-		if (m_scene->mRootNode)
-			drawNode(m_scene->mRootNode);
+				glBindVertexArray(mesh.vao);
+				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
+
+				// Check EBO binding
+				GLint ebo = 0;
+				glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &ebo);
+				qDebug() << "Drawing mesh" << meshIdx << "VAO" << mesh.vao << "EBO" << mesh.ebo << "EBO bound:" << ebo << "indexCount:" << mesh.indexCount;
+
+				GLint enabled0 = 0, enabled1 = 0, enabled2 = 0;
+				glGetVertexAttribiv(0, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled0);
+				glGetVertexAttribiv(1, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled1);
+				glGetVertexAttribiv(2, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled2);
+				qDebug() << "Attrib 0:" << enabled0 << "Attrib 1:" << enabled1 << "Attrib 2:" << enabled2;
+
+				GLint buf0 = 0, buf1 = 0, buf2 = 0;
+				glGetVertexAttribiv(0, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &buf0);
+				glGetVertexAttribiv(1, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &buf1);
+				glGetVertexAttribiv(2, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &buf2);
+				qDebug() << "Attrib 0 buffer:" << buf0 << "Attrib 1 buffer:" << buf1 << "Attrib 2 buffer:" << buf2;
+
+				GLint currentProgram = 0;
+				glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram);
+				qDebug() << "Current program:" << currentProgram << "Expected:" << m_meshShaderProgram;
+
+				glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp.constData());
+				qDebug() << "Drawing mesh" << meshIdx << "indexCount:" << mesh.indexCount;
+				glDrawElements(GL_TRIANGLES, mesh.indexCount, GL_UNSIGNED_INT, 0);
+				
+				GLenum err = glGetError();
+				if (err != GL_NO_ERROR) {
+					qDebug() << "OpenGL error after glDrawElements:" << err;
+				}
+
+				glBindVertexArray(0);
+			}
+			for (const ModernSceneNode& child : node.children)
+				drawNodeModern(child, globalTransform);
+			};
+		drawNodeModern(m_modernRootNode, QMatrix4x4());
+		glUseProgram(0);
 	}
 
-	drawTrihedronOverlay();
+	// Draw test triangle (modern OpenGL, for reference)
+	/*glUseProgram(m_testShaderProgram);
+	glBindVertexArray(m_testVao);
+	QMatrix4x4 mvp;
+	mvp.perspective(45.0f, float(width()) / height(), 0.1f, 10.0f);
+	mvp.translate(0, 0, -2);
+	GLint mvpLoc = glGetUniformLocation(m_testShaderProgram, "mvp");
+	//glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp.constData());
+	//glDrawArrays(GL_TRIANGLES, 0, 3);
+	//glBindVertexArray(0);
+	//glUseProgram(0);
+
+	glUseProgram(m_testShaderProgram);
+	glBindVertexArray(testMeshVAO);
+	glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp.constData());
+	glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, 0);
+	glBindVertexArray(0);
+	glUseProgram(0);*/
 }
 
 void ModelViewerWidget::updateCamera() {
@@ -372,32 +614,169 @@ void ModelViewerWidget::drawTrihedronOverlay() {
 
 
 
-void ModelViewerWidget::loadModel(const QString& filePath) {
+//void ModelViewerWidget::loadModel(const QString& filePath) {
+//
+//	if (m_scene)
+//	{
+//		m_importer.FreeScene();
+//		m_scene = nullptr;
+//	}
+//	QFileInfo fileInfo(filePath);
+//	m_lastModelPath = fileInfo.absolutePath();
+//	resetView();
+//	for (auto texId : m_materialTextureCache) {
+//		if (texId.second) glDeleteTextures(1, &texId.second);
+//	}
+//	m_materialTextureCache.clear();
+//	m_scene = m_importer.ReadFile(filePath.toStdString(),
+//		aiProcess_Triangulate | aiProcess_ValidateDataStructure |
+//		aiProcess_CalcTangentSpace | aiProcess_GenSmoothNormals |
+//		aiProcess_FixInfacingNormals | aiProcess_JoinIdenticalVertices |
+//		aiProcess_OptimizeMeshes | aiProcess_GenUVCoords | aiProcess_SortByPType);
+//
+//	if (!m_scene || m_scene->mFlags == AI_SCENE_FLAGS_INCOMPLETE || !m_scene->mRootNode) // if is Not Zero
+//	{
+//		qDebug() << "ERROR::ASSIMP:: " << m_importer.GetErrorString();
+//		m_scene = nullptr;
+//		return;
+//	}
+//
+//	updateCamera();
+//	update();
+//}
 
-	if (m_scene)
-	{
-		m_importer.FreeScene();
-		m_scene = nullptr;
+void ModelViewerWidget::loadModel(const QString& filePath) {
+	makeCurrent();
+	// ... (existing cleanup code) ...
+	for (const ModernMesh& mesh : m_modernMeshes) {
+		if (mesh.vao) glDeleteVertexArrays(1, &mesh.vao);
+		if (mesh.vbo) glDeleteBuffers(1, &mesh.vbo);
+		if (mesh.ebo) glDeleteBuffers(1, &mesh.ebo);
 	}
-	QFileInfo fileInfo(filePath);
-	m_lastModelPath = fileInfo.absolutePath();
-	resetView();
-	for (auto texId : m_materialTextureCache) {
-		if (texId.second) glDeleteTextures(1, &texId.second);
-	}
-	m_materialTextureCache.clear();
+	m_modernMeshes.clear();
+	m_modernRootNode = ModernSceneNode();
+
 	m_scene = m_importer.ReadFile(filePath.toStdString(),
 		aiProcess_Triangulate | aiProcess_ValidateDataStructure |
 		aiProcess_CalcTangentSpace | aiProcess_GenSmoothNormals |
 		aiProcess_FixInfacingNormals | aiProcess_JoinIdenticalVertices |
 		aiProcess_OptimizeMeshes | aiProcess_GenUVCoords | aiProcess_SortByPType);
 
-	if (!m_scene || m_scene->mFlags == AI_SCENE_FLAGS_INCOMPLETE || !m_scene->mRootNode) // if is Not Zero
-	{
+	if (!m_scene || m_scene->mFlags == AI_SCENE_FLAGS_INCOMPLETE || !m_scene->mRootNode) {
 		qDebug() << "ERROR::ASSIMP:: " << m_importer.GetErrorString();
 		m_scene = nullptr;
 		return;
 	}
+
+	m_modernMeshes.reserve(m_scene->mNumMeshes);
+
+	// --- Upload all meshes ---
+	for (unsigned int i = 0; i < m_scene->mNumMeshes; ++i) {
+		const aiMesh* mesh = m_scene->mMeshes[i];
+		qDebug() << mesh->mNumVertices;
+		ModernMesh modernMesh;
+		modernMesh.name = mesh->mName.C_Str();
+		modernMesh.materialIndex = mesh->mMaterialIndex;
+
+		
+
+		for (unsigned int v = 0; v < mesh->mNumVertices; ++v) {
+			// Position
+			modernMesh.vertexData.push_back(mesh->mVertices[v].x);
+			modernMesh.vertexData.push_back(mesh->mVertices[v].y);
+			modernMesh.vertexData.push_back(mesh->mVertices[v].z);
+			// Normal
+			if (mesh->HasNormals()) {
+				modernMesh.vertexData.push_back(mesh->mNormals[v].x);
+				modernMesh.vertexData.push_back(mesh->mNormals[v].y);
+				modernMesh.vertexData.push_back(mesh->mNormals[v].z);
+			}
+			else {
+				modernMesh.vertexData.push_back(0.0f);
+				modernMesh.vertexData.push_back(0.0f);
+				modernMesh.vertexData.push_back(0.0f);
+			}
+			// Texcoord (first channel)
+			if (mesh->HasTextureCoords(0)) {
+				modernMesh.vertexData.push_back(mesh->mTextureCoords[0][v].x);
+				modernMesh.vertexData.push_back(mesh->mTextureCoords[0][v].y);
+			}
+			else {
+				modernMesh.vertexData.push_back(0.0f);
+				modernMesh.vertexData.push_back(0.0f);
+			}
+		}
+
+		for (unsigned int f = 0; f < mesh->mNumFaces; ++f) {
+			const aiFace& face = mesh->mFaces[f];
+			for (unsigned int j = 0; j < face.mNumIndices; ++j) {
+				if (face.mIndices[j] >= mesh->mNumVertices) {
+					qDebug() << "Out-of-bounds index:" << face.mIndices[j] << "in mesh" << i;
+				}
+				modernMesh.indices.push_back(face.mIndices[j]);
+			}
+		}
+
+		aiColor4D diffuse(0.8f, 0.8f, 0.8f, 1.0f);
+		aiMaterial* material = m_scene->mMaterials[mesh->mMaterialIndex];
+		if (AI_SUCCESS == aiGetMaterialColor(material, AI_MATKEY_COLOR_DIFFUSE, &diffuse)) {
+			modernMesh.color = QVector4D(diffuse.r, diffuse.g, diffuse.b, diffuse.a);
+		}
+		else {
+			modernMesh.color = QVector4D(0.8f, 0.8f, 0.8f, 1.0f);
+		}
+
+
+		for (size_t i = 0; i < std::min<size_t>(modernMesh.vertexData.size(), 24); ++i)
+			qDebug() << "vertexData[" << i << "]:" << modernMesh.vertexData[i];
+
+		qDebug() << "Uploading VBO size:" << modernMesh.vertexData.size() * sizeof(float)
+			<< "EBO size:" << modernMesh.indices.size() * sizeof(unsigned int);
+
+
+		modernMesh.indexCount = static_cast<int>(modernMesh.indices.size());
+
+
+		qDebug() << "Mesh" << i
+			<< "indexCount:" << modernMesh.indices.size()
+			<< "vertexCount:" << mesh->mNumVertices
+			<< "first indices:" << (modernMesh.indices.size() > 0 ? modernMesh.indices[0] : -1)
+			<< (modernMesh.indices.size() > 1 ? modernMesh.indices[1] : -1)
+			<< (modernMesh.indices.size() > 2 ? modernMesh.indices[2] : -1);
+
+		for (size_t idx = 0; idx < modernMesh.indices.size(); ++idx) {
+			if (modernMesh.indices[idx] >= mesh->mNumVertices) {
+				qDebug() << "Out-of-bounds index:" << modernMesh.indices[idx] << "in mesh" << i;
+				break; // Stop after first error
+			}
+		}
+
+		qDebug() << "Uploading mesh" << i << "indexCount:" << modernMesh.indices.size();
+		for (size_t k = 0; k < std::min<size_t>(modernMesh.indices.size(), 10); ++k)
+			qDebug() << "Index" << k << ":" << modernMesh.indices[k];
+
+		m_modernMeshes.push_back(std::move(modernMesh));
+	}
+
+	// --- Build scene graph ---
+	std::function<ModernSceneNode(const aiNode*)> buildNode = [&](const aiNode* node) -> ModernSceneNode {
+		ModernSceneNode n;
+		n.name = node->mName.C_Str();
+		// Convert aiMatrix4x4 to QMatrix4x4
+		const aiMatrix4x4& m = node->mTransformation;
+		n.transform = QMatrix4x4(
+			m.a1, m.b1, m.c1, m.d1,
+			m.a2, m.b2, m.c2, m.d2,
+			m.a3, m.b3, m.c3, m.d3,
+			m.a4, m.b4, m.c4, m.d4
+		);
+		for (unsigned int i = 0; i < node->mNumMeshes; ++i)
+			n.meshIndices.push_back(node->mMeshes[i]);
+		for (unsigned int i = 0; i < node->mNumChildren; ++i)
+			n.children.push_back(buildNode(node->mChildren[i]));
+		return n;
+		};
+	m_modernRootNode = buildNode(m_scene->mRootNode);
 
 	updateCamera();
 	update();
