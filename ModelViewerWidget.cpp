@@ -80,7 +80,7 @@ ModelViewerWidget::ModelViewerWidget(QWidget* parent)
 			projToggleButton->setIcon(QIcon(":/icons/res/Perspective.png"));
 			projToggleButton->setIconSize(QSize(64, 64));
 			projToggleButton->setToolTip("Switch to Orthographic");
-		}		
+		}
 		update();
 		});
 
@@ -138,9 +138,9 @@ GLuint ModelViewerWidget::createProgram(const char* vsrc, const char* fsrc) {
 
 void ModelViewerWidget::initializeGL() {
 	initializeOpenGLFunctions();
-	
+
 	glEnable(GL_DEPTH_TEST);
-	
+
 	m_camera = new GLCamera(height(), width(), m_viewRadius, 45);
 	m_camera->setProjectionType(GLCamera::ProjectionType::PERSPECTIVE);
 	m_camera->setView(GLCamera::ViewProjection::SE_ISOMETRIC_VIEW);
@@ -154,76 +154,58 @@ void ModelViewerWidget::initializeGL() {
 		m_camera->setProjectionType(GLCamera::ProjectionType::PERSPECTIVE);
 	}
 
-	
-	// Load shader sources (for demo, you can hardcode or load from file)
-	const char* vsrc =
-		"#version 330 core\n"
-		"layout(location = 0) in vec3 position;\n"
-		"uniform mat4 mvp;\n"
-		"void main() { gl_Position = mvp * vec4(position, 1.0); }\n";
-	const char* fsrc =
-		"#version 330 core\n"
-		"uniform vec4 color;"
-		"out vec4 fragColor;\n"
-		"void main() { fragColor = color; }\n";
-	m_testShaderProgram = createProgram(vsrc, fsrc);
 
-	const char* meshVSrc =
+	// Load shader sources (for demo, you can hardcode or load from file)
+
+	const char* phongVertexShaderSrc =
 		"#version 330 core\n"
 		"layout(location = 0) in vec3 position;\n"
 		"layout(location = 1) in vec3 normal;\n"
 		"layout(location = 2) in vec2 texcoord;\n"
 		"uniform mat4 mvp;\n"
+		"uniform mat4 model;\n"
+		"out vec3 fragNormal;\n"
+		"out vec3 fragPos;\n"
 		"void main() {\n"
-		"	gl_Position = mvp * vec4(position, 1.0);\n"
+		"    fragPos = vec3(model * vec4(position, 1.0));\n"
+		"    fragNormal = mat3(transpose(inverse(model))) * normal;\n"
+		"    gl_Position = mvp * vec4(position, 1.0);\n"
 		"}\n";
 
-	m_meshShaderProgram = createProgram(meshVSrc, fsrc);
+	const char* phongFragmentShaderSrc =
+		"#version 330 core\n"
+		"in vec3 fragNormal;\n"
+		"in vec3 fragPos;\n"
+		"uniform vec4 color;\n"
+		"uniform vec3 ambientColor;\n"
+		"uniform vec3 specularColor;\n"
+		"uniform float shininess;\n"
+		"uniform vec3 lightDir;\n"
+		"uniform vec3 viewPos;\n"
+		"out vec4 fragColor;\n"
+		"void main() {\n"
+		"    vec3 norm = normalize(fragNormal);\n"
+		"    // Hard-coded sky and ground colors\n"
+		"	 vec3 skyColor = vec3(0.6, 0.7, 1.0);\n"
+		"	 vec3 groundColor = vec3(0.3, 0.25, 0.2);\n"
+		"    float hemi = norm.y * 0.5 + 0.5;\n"
+		"	 vec3 hemiLight = mix(groundColor, skyColor, hemi);\n"
+		"	 vec3 ambient = ambientColor * color.rgb;\n"
+		"	 float diff = max(dot(norm, lightDir), 0.0);\n"
+		"	 vec3 diffuse = diff * color.rgb;\n"
+		"	 vec3 viewDir = normalize(viewPos - fragPos);\n"
+		"	 vec3 reflectDir = reflect(-lightDir, norm);\n"
+		"	 float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);\n"
+		"	 vec3 specular = specularColor * spec;\n"		
+		"	 vec3 result = ambient + diffuse + specular + 0.5 * hemiLight * color.rgb;\n"
+		"	 fragColor = vec4(result, color.a);\n"
+		"}\n";
 
-	/*
-	// Create a test triangle
-	float vertices[] = {
-		0.0f,  0.5f, 0.0f,
-	   -0.5f, -0.5f, 0.0f,
-		0.5f, -0.5f, 0.0f
-	};
-	glGenVertexArrays(1, &m_testVao);
-	glGenBuffers(1, &m_testVbo);
-	glBindVertexArray(m_testVao);
-	glBindBuffer(GL_ARRAY_BUFFER, m_testVbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-	glBindVertexArray(0);
-
-	// Minimal mesh test: create a VAO/VBO/EBO for a single triangle
-	float meshVertices[] = {
-		0.0f,  0.5f, 0.0f,
-	   -0.5f, -0.5f, 0.0f,
-		0.5f, -0.5f, 0.0f
-	};
-	GLushort meshIndices[] = { 0, 1, 2 };
-
-
-	glGenVertexArrays(1, &testMeshVAO);
-	glGenBuffers(1, &testMeshVBO);
-	glGenBuffers(1, &testMeshEBO);
-
-	glBindVertexArray(testMeshVAO);
-	glBindBuffer(GL_ARRAY_BUFFER, testMeshVBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(meshVertices), meshVertices, GL_STATIC_DRAW);
-	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, testMeshEBO);
-	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(meshIndices), meshIndices, GL_STATIC_DRAW);
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-	glBindVertexArray(0);
-	*/
+	m_meshShaderProgram = createProgram(phongVertexShaderSrc, phongFragmentShaderSrc);
 }
 
 void ModelViewerWidget::resizeGL(int w, int h) {
 	glViewport(0, 0, w, h);
-	//glMatrixMode(GL_PROJECTION);
-	//glLoadIdentity();
 
 	if (h == 0) h = 1; // Prevent division by zero
 
@@ -243,67 +225,36 @@ void ModelViewerWidget::resizeGL(int w, int h) {
 
 }
 
-//void ModelViewerWidget::paintGL() {
-//	
-//	glViewport(0, 0, width(), height());
-//	glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
-//	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-//
-//	// --- Legacy OpenGL code first ---
-//	drawGradientBackground();
-//
-//	m_viewMatrix.setToIdentity();
-//	m_viewMatrix = m_camera->getViewMatrix();
-//	m_projectionMatrix = m_camera->getProjectionMatrix();
-//
-//	glMatrixMode(GL_PROJECTION);
-//	glLoadIdentity();
-//	glLoadMatrixf(m_projectionMatrix.constData());
-//
-//	glMatrixMode(GL_MODELVIEW);
-//	glLoadIdentity();
-//
-//	QMatrix4x4 modelViewMatrix = m_viewMatrix * m_modelMatrix;
-//	glLoadMatrixf(modelViewMatrix.constData());
-//
-//	if (m_scene && m_scene->mRootNode)
-//		drawNode(m_scene->mRootNode);
-//
-//	drawTrihedronOverlay();
-//
-//	// --- Now draw the modern OpenGL test triangle LAST ---
-//	// Reset state for modern OpenGL
-//	glUseProgram(m_testShaderProgram);
-//	glBindVertexArray(m_testVao);
-//
-//	// Set viewport and depth state again, in case legacy code changed it
-//	glViewport(0, 0, width(), height());
-//	glEnable(GL_DEPTH_TEST);
-//	glDepthFunc(GL_LESS);
-//
-//	// Use a simple MVP
-//	QMatrix4x4 mvp;
-//	mvp.perspective(45.0f, float(width()) / height(), 0.1f, 10.0f);
-//	mvp.translate(0, 0, -2);
-//	GLint mvpLoc = glGetUniformLocation(m_testShaderProgram, "mvp");
-//	glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp.constData());
-//
-//	glDrawArrays(GL_TRIANGLES, 0, 3);
-//
-//	glBindVertexArray(0);
-//	glUseProgram(0);
-//}
-
 void ModelViewerWidget::paintGL() {
 	glViewport(0, 0, width(), height());
+
+	drawGradientBackground();	
+
 	glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-
+	
 	m_viewMatrix = m_camera->getViewMatrix();
 	m_projectionMatrix = m_camera->getProjectionMatrix();
 
 	if (!m_modernMeshes.empty()) {
+
+		glUseProgram(m_meshShaderProgram);
+
+		// Set default lighting values
+		float ambient[] = { 0.4f, 0.4f, 0.4f };
+		float specular[] = { 0.7f, 0.7f, 0.7f };
+		float shininess = 32.0f;		
+		QVector3D cpos = m_camera->getPosition();
+		float viewPos[] = { cpos.x(), cpos.y(), cpos.z() };
+		
+		glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "ambientColor"), 1, ambient);
+		glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "specularColor"), 1, specular);
+		glUniform1f(glGetUniformLocation(m_meshShaderProgram, "shininess"), shininess);
+		
+		glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "viewPos"), 1, viewPos);
+
+		GLint mvpLoc = glGetUniformLocation(m_meshShaderProgram, "mvp");
+		GLint modelLoc = glGetUniformLocation(m_meshShaderProgram, "model");
 
 
 		for (ModernMesh& modernMesh : m_modernMeshes) {
@@ -319,16 +270,7 @@ void ModelViewerWidget::paintGL() {
 				glGenBuffers(1, &modernMesh.ebo);
 				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modernMesh.ebo);
 				glBufferData(GL_ELEMENT_ARRAY_BUFFER, modernMesh.indices.size() * sizeof(unsigned int), modernMesh.indices.data(), GL_STATIC_DRAW);
-
-				GLint eboCheck = 0;
-				glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &eboCheck);
-				qDebug() << "After VAO setup: VAO" << modernMesh.vao << "EBO" << modernMesh.ebo << "EBO bound:" << eboCheck;
-
-				GLenum err = glGetError();
-				if (err != GL_NO_ERROR) {
-					qDebug() << "OpenGL error after EBO upload:" << err;
-				}
-
+				
 				// Attribute layout: pos(3), normal(3), texcoord(2)
 				int stride = 8 * sizeof(float);
 				glEnableVertexAttribArray(0); // position
@@ -338,22 +280,19 @@ void ModelViewerWidget::paintGL() {
 				glEnableVertexAttribArray(2); // texcoord
 				glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
 
-				glBindVertexArray(0);
-
-				err = glGetError();
-				if (err != GL_NO_ERROR) {
-					qDebug() << "OpenGL error after VAO/VBO setup:" << err;
-				}
+				glBindVertexArray(0);				
 			}
 		}
-
-		glUseProgram(m_meshShaderProgram);
-		GLint mvpLoc = glGetUniformLocation(m_meshShaderProgram, "mvp");
 		
 		std::function<void(const ModernSceneNode&, QMatrix4x4)> drawNodeModern;
 		drawNodeModern = [&](const ModernSceneNode& node, QMatrix4x4 parentTransform) {
 			QMatrix4x4 globalTransform = parentTransform * node.transform;
 			QMatrix4x4 mvp = m_projectionMatrix * m_viewMatrix * globalTransform;
+
+			QVector3D lightDirWorld = QVector3D(1.0f, 1.0f, 1.0f).normalized();
+			float lightDir[3] = { lightDirWorld.x(), lightDirWorld.y(), lightDirWorld.z() };
+			glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "lightDir"), 1, lightDir);
+
 			for (int meshIdx : node.meshIndices) {
 				if (meshIdx < 0 || meshIdx >= int(m_modernMeshes.size())) continue;
 				const ModernMesh& mesh = m_modernMeshes[meshIdx];
@@ -365,64 +304,21 @@ void ModelViewerWidget::paintGL() {
 
 				glBindVertexArray(mesh.vao);
 				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
-
-				// Check EBO binding
-				GLint ebo = 0;
-				glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &ebo);
-				qDebug() << "Drawing mesh" << meshIdx << "VAO" << mesh.vao << "EBO" << mesh.ebo << "EBO bound:" << ebo << "indexCount:" << mesh.indexCount;
-
-				GLint enabled0 = 0, enabled1 = 0, enabled2 = 0;
-				glGetVertexAttribiv(0, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled0);
-				glGetVertexAttribiv(1, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled1);
-				glGetVertexAttribiv(2, GL_VERTEX_ATTRIB_ARRAY_ENABLED, &enabled2);
-				qDebug() << "Attrib 0:" << enabled0 << "Attrib 1:" << enabled1 << "Attrib 2:" << enabled2;
-
-				GLint buf0 = 0, buf1 = 0, buf2 = 0;
-				glGetVertexAttribiv(0, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &buf0);
-				glGetVertexAttribiv(1, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &buf1);
-				glGetVertexAttribiv(2, GL_VERTEX_ATTRIB_ARRAY_BUFFER_BINDING, &buf2);
-				qDebug() << "Attrib 0 buffer:" << buf0 << "Attrib 1 buffer:" << buf1 << "Attrib 2 buffer:" << buf2;
-
-				GLint currentProgram = 0;
-				glGetIntegerv(GL_CURRENT_PROGRAM, &currentProgram);
-				qDebug() << "Current program:" << currentProgram << "Expected:" << m_meshShaderProgram;
-
+								
 				glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp.constData());
-				qDebug() << "Drawing mesh" << meshIdx << "indexCount:" << mesh.indexCount;
+				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, globalTransform.constData());
+								
 				glDrawElements(GL_TRIANGLES, mesh.indexCount, GL_UNSIGNED_INT, 0);
-				
-				GLenum err = glGetError();
-				if (err != GL_NO_ERROR) {
-					qDebug() << "OpenGL error after glDrawElements:" << err;
-				}
 
 				glBindVertexArray(0);
 			}
 			for (const ModernSceneNode& child : node.children)
 				drawNodeModern(child, globalTransform);
 			};
+
 		drawNodeModern(m_modernRootNode, QMatrix4x4());
 		glUseProgram(0);
-	}
-
-	// Draw test triangle (modern OpenGL, for reference)
-	/*glUseProgram(m_testShaderProgram);
-	glBindVertexArray(m_testVao);
-	QMatrix4x4 mvp;
-	mvp.perspective(45.0f, float(width()) / height(), 0.1f, 10.0f);
-	mvp.translate(0, 0, -2);
-	GLint mvpLoc = glGetUniformLocation(m_testShaderProgram, "mvp");
-	//glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp.constData());
-	//glDrawArrays(GL_TRIANGLES, 0, 3);
-	//glBindVertexArray(0);
-	//glUseProgram(0);
-
-	glUseProgram(m_testShaderProgram);
-	glBindVertexArray(testMeshVAO);
-	glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp.constData());
-	glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_SHORT, 0);
-	glBindVertexArray(0);
-	glUseProgram(0);*/
+	}		
 }
 
 void ModelViewerWidget::updateCamera() {
@@ -449,10 +345,10 @@ void ModelViewerWidget::updateCamera() {
 	QVector3D camPos = center + QVector3D(0, 0, m_cameraDistance);
 
 	m_camera->setViewRange(m_viewRadius * 2.1f);
-		
+
 	QVector3D viewPos(m_viewCenter.x, m_viewCenter.y, m_viewCenter.z);
-	m_camera->setPosition(viewPos);	
-	
+	m_camera->setPosition(viewPos);
+
 	m_viewMatrix = m_camera->getViewMatrix();
 	m_projectionMatrix = m_camera->getProjectionMatrix();
 
@@ -612,42 +508,8 @@ void ModelViewerWidget::drawTrihedronOverlay() {
 	glPopAttrib();
 }
 
-
-
-//void ModelViewerWidget::loadModel(const QString& filePath) {
-//
-//	if (m_scene)
-//	{
-//		m_importer.FreeScene();
-//		m_scene = nullptr;
-//	}
-//	QFileInfo fileInfo(filePath);
-//	m_lastModelPath = fileInfo.absolutePath();
-//	resetView();
-//	for (auto texId : m_materialTextureCache) {
-//		if (texId.second) glDeleteTextures(1, &texId.second);
-//	}
-//	m_materialTextureCache.clear();
-//	m_scene = m_importer.ReadFile(filePath.toStdString(),
-//		aiProcess_Triangulate | aiProcess_ValidateDataStructure |
-//		aiProcess_CalcTangentSpace | aiProcess_GenSmoothNormals |
-//		aiProcess_FixInfacingNormals | aiProcess_JoinIdenticalVertices |
-//		aiProcess_OptimizeMeshes | aiProcess_GenUVCoords | aiProcess_SortByPType);
-//
-//	if (!m_scene || m_scene->mFlags == AI_SCENE_FLAGS_INCOMPLETE || !m_scene->mRootNode) // if is Not Zero
-//	{
-//		qDebug() << "ERROR::ASSIMP:: " << m_importer.GetErrorString();
-//		m_scene = nullptr;
-//		return;
-//	}
-//
-//	updateCamera();
-//	update();
-//}
-
 void ModelViewerWidget::loadModel(const QString& filePath) {
-	makeCurrent();
-	// ... (existing cleanup code) ...
+	
 	for (const ModernMesh& mesh : m_modernMeshes) {
 		if (mesh.vao) glDeleteVertexArrays(1, &mesh.vao);
 		if (mesh.vbo) glDeleteBuffers(1, &mesh.vbo);
@@ -672,13 +534,10 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 
 	// --- Upload all meshes ---
 	for (unsigned int i = 0; i < m_scene->mNumMeshes; ++i) {
-		const aiMesh* mesh = m_scene->mMeshes[i];
-		qDebug() << mesh->mNumVertices;
+		const aiMesh* mesh = m_scene->mMeshes[i];		
 		ModernMesh modernMesh;
 		modernMesh.name = mesh->mName.C_Str();
 		modernMesh.materialIndex = mesh->mMaterialIndex;
-
-		
 
 		for (unsigned int v = 0; v < mesh->mNumVertices; ++v) {
 			// Position
@@ -725,36 +584,16 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 		else {
 			modernMesh.color = QVector4D(0.8f, 0.8f, 0.8f, 1.0f);
 		}
-
-
-		for (size_t i = 0; i < std::min<size_t>(modernMesh.vertexData.size(), 24); ++i)
-			qDebug() << "vertexData[" << i << "]:" << modernMesh.vertexData[i];
-
-		qDebug() << "Uploading VBO size:" << modernMesh.vertexData.size() * sizeof(float)
-			<< "EBO size:" << modernMesh.indices.size() * sizeof(unsigned int);
-
-
+				
 		modernMesh.indexCount = static_cast<int>(modernMesh.indices.size());
-
-
-		qDebug() << "Mesh" << i
-			<< "indexCount:" << modernMesh.indices.size()
-			<< "vertexCount:" << mesh->mNumVertices
-			<< "first indices:" << (modernMesh.indices.size() > 0 ? modernMesh.indices[0] : -1)
-			<< (modernMesh.indices.size() > 1 ? modernMesh.indices[1] : -1)
-			<< (modernMesh.indices.size() > 2 ? modernMesh.indices[2] : -1);
-
+				
 		for (size_t idx = 0; idx < modernMesh.indices.size(); ++idx) {
 			if (modernMesh.indices[idx] >= mesh->mNumVertices) {
 				qDebug() << "Out-of-bounds index:" << modernMesh.indices[idx] << "in mesh" << i;
 				break; // Stop after first error
 			}
 		}
-
-		qDebug() << "Uploading mesh" << i << "indexCount:" << modernMesh.indices.size();
-		for (size_t k = 0; k < std::min<size_t>(modernMesh.indices.size(), 10); ++k)
-			qDebug() << "Index" << k << ":" << modernMesh.indices[k];
-
+				
 		m_modernMeshes.push_back(std::move(modernMesh));
 	}
 
@@ -819,101 +658,6 @@ void ModelViewerWidget::highlightNode(aiNode* node) {
 	update();
 }
 
-void ModelViewerWidget::drawNode(aiNode* node)
-{
-	for (unsigned i = 0; i < node->mNumMeshes; ++i) {
-		const aiMesh* mesh = m_scene->mMeshes[node->mMeshes[i]];
-		if (!mesh) continue;
-
-		const aiMaterial* material = m_scene->mMaterials[mesh->mMaterialIndex];
-		GLuint texId = loadTextureIfNeeded(material, mesh->mMaterialIndex);
-
-		if (texId) {
-			glEnable(GL_TEXTURE_2D);
-			glBindTexture(GL_TEXTURE_2D, texId);
-		}
-		else {
-			glDisable(GL_TEXTURE_2D);
-		}
-
-		aiColor4D diffuse;
-		if (AI_SUCCESS == aiGetMaterialColor(material, AI_MATKEY_COLOR_DIFFUSE, &diffuse)) {
-			glColor4f(diffuse.r, diffuse.g, diffuse.b, diffuse.a);
-		}
-		else {
-			glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
-		}
-
-		if (node == m_highlightedNode && !texId) {
-			// Set full specular material color for highlighted node
-			GLfloat materialSpecular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
-			glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, materialSpecular);
-		}
-		else {
-			// Set default specular color
-			GLfloat materialSpecular[] = { 0.5f, 0.5f, 0.5f, 1.0f };
-			glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, materialSpecular);
-		}
-
-		glBegin(GL_TRIANGLES);
-		for (unsigned int j = 0; j < mesh->mNumFaces; ++j) {
-			const aiFace& face = mesh->mFaces[j];
-			for (unsigned int k = 0; k < face.mNumIndices; ++k) {
-				unsigned int index = face.mIndices[k];
-				if (mesh->HasNormals()) {
-					const aiVector3D& n = mesh->mNormals[index];
-					glNormal3f(n.x, n.y, n.z);
-				}
-				if (mesh->HasTextureCoords(0)) {
-					const aiVector3D& uv = mesh->mTextureCoords[0][index];
-					glTexCoord2f(uv.x, uv.y);
-				}
-
-				if (node == m_highlightedNode && !texId)
-					glColor3d(204, 255, 0); // Flourescent Yellow highlight
-
-				const aiVector3D& v = mesh->mVertices[index];
-				glVertex3f(v.x, v.y, v.z);
-			}
-		}
-		glEnd();
-		glDisable(GL_TEXTURE_2D);
-
-		// Optional second pass: wireframe highlight
-		if (node == m_highlightedNode && texId) {
-			glPushAttrib(GL_ENABLE_BIT | GL_POLYGON_BIT | GL_LINE_BIT);
-
-			glDisable(GL_LIGHTING);
-			glDisable(GL_TEXTURE_2D);
-			glEnable(GL_POLYGON_OFFSET_LINE);
-			glPolygonOffset(-1.0f, -1.0f); // Pull forward to avoid z-fighting
-
-			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-			glLineWidth(0.50f);
-			glColor3d(204, 255, 0); // Flourescent Yellow highlight           
-			glBegin(GL_TRIANGLES);
-			for (unsigned int j = 0; j < mesh->mNumFaces; ++j) {
-				const aiFace& face = mesh->mFaces[j];
-				for (unsigned int k = 0; k < face.mNumIndices; ++k) {
-					unsigned int index = face.mIndices[k];
-					const aiVector3D& v = mesh->mVertices[index];
-					glVertex3f(v.x, v.y, v.z);
-				}
-			}
-			glEnd();
-
-			glPopAttrib();
-		}
-
-		if (texId)
-			glBindTexture(GL_TEXTURE_2D, 0);
-	}
-
-	for (unsigned i = 0; i < node->mNumChildren; ++i)
-		drawNode(node->mChildren[i]);
-}
-
-
 void ModelViewerWidget::mousePressEvent(QMouseEvent* event)
 {
 	m_isDragging = true;
@@ -954,7 +698,7 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
 		QPoint rotate = m_lastMousePos - downPoint;
 
 		m_camera->rotateX(rotate.y() / 2.0);
-		m_camera->rotateY(rotate.x() / 2.0);		
+		m_camera->rotateY(rotate.x() / 2.0);
 
 		// Store rotation velocity
 		m_rotationVelocity = QVector2D(delta.x(), delta.y()) / 2.0f;
@@ -973,7 +717,7 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
 
 		m_panVelocity = OP;
 		m_inertiaActive = false;
-				
+
 	}
 	else if (m_mode == InteractionMode::Zoom) {
 
@@ -985,7 +729,7 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent* event)
 			m_viewRadius /= 1.05f;
 		else
 			m_viewRadius *= 1.05f;
-		
+
 		// Translate to focus on mouse center
 		QPoint cen = QRect(0, 0, width(), height()).center();
 		float sign = (downPoint.x() > m_lastMousePos.x() || downPoint.y() < m_lastMousePos.y()) ? 1.0f : -1.0f;
@@ -1011,11 +755,11 @@ void ModelViewerWidget::mouseReleaseEvent(QMouseEvent* event)
 	setCursor(QCursor(Qt::ArrowCursor));
 
 	m_isDragging = false;
-	
+
 	int movementThreshold = 1; // Keep low for now
-	
-	if (m_totalMouseDelta.manhattanLength() > movementThreshold) 
-	{			
+
+	if (m_totalMouseDelta.manhattanLength() > movementThreshold)
+	{
 		if (!m_inertiaTimer->isActive())
 		{
 			m_inertiaTimer->start(16); // 60 fps
@@ -1025,7 +769,7 @@ void ModelViewerWidget::mouseReleaseEvent(QMouseEvent* event)
 	else {
 		// No real movement ? don't start inertia		
 		m_panVelocity = QVector3D(0, 0, 0);
-		m_zoomPanVelocity = QVector3D(0, 0, 0);	
+		m_zoomPanVelocity = QVector3D(0, 0, 0);
 		m_zoomVelocity = 0.0f;
 		m_rotationVelocity = QVector2D(0, 0);
 		m_inertiaTimer->stop();
@@ -1040,7 +784,7 @@ void ModelViewerWidget::wheelEvent(QWheelEvent* event)
 {
 	QPoint numDegrees = event->angleDelta() / 8;
 	if (!numDegrees.isNull()) {
-		
+
 		if (!m_inertiaTimer->isActive())
 			m_inertiaTimer->start(16);
 
@@ -1064,7 +808,7 @@ void ModelViewerWidget::wheelEvent(QWheelEvent* event)
 		// Add to velocities instead of overriding
 		m_zoomVelocity += sign * 0.1f; // Tune factor
 		m_zoomPanVelocity += OP * sign * 0.05f;
-		
+
 	}
 	resizeGL(width(), height());
 	update();
@@ -1099,7 +843,7 @@ void ModelViewerWidget::keyPressEvent(QKeyEvent* event) {
 			updateCamera();
 			update();
 		}
-	}	
+	}
 }
 
 void ModelViewerWidget::resizeEvent(QResizeEvent* event) {
@@ -1144,9 +888,9 @@ void ModelViewerWidget::setViewProjection(ViewProjection view)
 	case ViewProjection::Bottom:
 		setViewBottom();
 		break;
-	case ViewProjection::Rear:	
+	case ViewProjection::Rear:
 		setViewRear();
-		break;	
+		break;
 	case ViewProjection::Right:
 		setViewRight();
 		break;
@@ -1158,7 +902,7 @@ void ModelViewerWidget::setViewProjection(ViewProjection view)
 		// Do nothing or reset to user-controlled
 		break;
 	}
-	
+
 	m_viewMatrix = m_camera->getViewMatrix();
 	m_projectionMatrix = m_camera->getProjectionMatrix();
 	update();
@@ -1207,9 +951,9 @@ void ModelViewerWidget::fitToView() {
 	update();
 }
 
-void ModelViewerWidget::onInertiaTimeout() 
+void ModelViewerWidget::onInertiaTimeout()
 {
-	if(m_mode == InteractionMode::Select)
+	if (m_mode == InteractionMode::Select)
 		return; // Don't apply inertia while selecting
 	if (!m_inertiaActive)
 		return;
@@ -1405,7 +1149,7 @@ aiNode* ModelViewerWidget::findNodeForMesh(aiNode* node, int meshIndex) {
 
 
 QVector3D ModelViewerWidget::get3dTranslationVectorFromMousePoints(const QPoint& start, const QPoint& end)
-{		
+{
 	QVector3D Z(0, 0, 0); // instead of 0 for x and y we need worldPosition.x() and worldPosition.y() ....
 	Z = Z.project(m_viewMatrix * m_modelMatrix, m_projectionMatrix, QRect(0, 0, width(), height()));
 	QVector3D p1(start.x(), height() - start.y(), Z.z());

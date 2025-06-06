@@ -80,7 +80,6 @@ private:
     void drawGradientBackground();
     void drawTrihedron(float axisLength = 1.0f, float axisRadius = 0.05f, float coneHeight = 0.2f, float coneRadius = 0.1f, float sphereRadius = 0.1f);
     void drawTrihedronOverlay();
-    void drawNode(aiNode* node);
     GLuint loadTextureIfNeeded(const aiMaterial* material, unsigned int materialIndex);
 	void updateCamera();
     void resetView();
