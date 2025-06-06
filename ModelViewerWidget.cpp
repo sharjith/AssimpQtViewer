@@ -164,11 +164,14 @@ void ModelViewerWidget::initializeGL() {
 		"layout(location = 2) in vec2 texcoord;\n"
 		"uniform mat4 mvp;\n"
 		"uniform mat4 model;\n"
+		"uniform mat4 view;\n"
 		"out vec3 fragNormal;\n"
 		"out vec3 fragPos;\n"
 		"void main() {\n"
-		"    fragPos = vec3(model * vec4(position, 1.0));\n"
-		"    fragNormal = mat3(transpose(inverse(model))) * normal;\n"
+		"    vec4 viewPos4 = view * model * vec4(position, 1.0);\n"
+		"    fragPos = viewPos4.xyz;\n"
+		"    mat3 normalMatrix = transpose(inverse(mat3(view * model)));\n"
+		"    fragNormal = normalize(normalMatrix * normal);\n"
 		"    gl_Position = mvp * vec4(position, 1.0);\n"
 		"}\n";
 
@@ -181,24 +184,25 @@ void ModelViewerWidget::initializeGL() {
 		"uniform vec3 specularColor;\n"
 		"uniform float shininess;\n"
 		"uniform vec3 lightDir;\n"
-		"uniform vec3 viewPos;\n"
 		"out vec4 fragColor;\n"
 		"void main() {\n"
 		"    vec3 norm = normalize(fragNormal);\n"
-		"    // Hard-coded sky and ground colors\n"
-		"	 vec3 skyColor = vec3(0.6, 0.7, 1.0);\n"
-		"	 vec3 groundColor = vec3(0.3, 0.25, 0.2);\n"
-		"    float hemi = norm.y * 0.5 + 0.5;\n"
-		"	 vec3 hemiLight = mix(groundColor, skyColor, hemi);\n"
-		"	 vec3 ambient = ambientColor * color.rgb;\n"
-		"	 float diff = max(dot(norm, lightDir), 0.0);\n"
-		"	 vec3 diffuse = diff * color.rgb;\n"
-		"	 vec3 viewDir = normalize(viewPos - fragPos);\n"
-		"	 vec3 reflectDir = reflect(-lightDir, norm);\n"
-		"	 float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);\n"
-		"	 vec3 specular = specularColor * spec;\n"		
-		"	 vec3 result = ambient + diffuse + specular + 0.5 * hemiLight * color.rgb;\n"
-		"	 fragColor = vec4(result, color.a);\n"
+		"    vec3 L = normalize(lightDir);\n"
+		"    vec3 V = normalize(-fragPos);\n"
+		"    float ndotv = max(dot(norm, V), 0.0);\n"
+		"    float diff = max(dot(norm, L), 0.0);\n"
+		"    vec3 ambient = ambientColor * color.rgb;\n"
+		"    vec3 diffuse = diff * color.rgb;\n"
+		"    float spec = 0.0;\n"
+		"    if (diff > 0.0 && ndotv > 0.1) {\n"
+		"        vec3 H = normalize(L + V);\n"
+		"        float nh = max(dot(norm, H), 0.0);\n"
+		"        if (nh > 0.0)\n"
+		"            spec = pow(nh, shininess);\n"
+		"    }\n"
+		"    vec3 specular = specularColor * spec;\n"
+		"    vec3 result = ambient + diffuse + specular;\n"
+		"    fragColor = vec4(clamp(result, 0.0, 1.0), color.a);\n"
 		"}\n";
 
 	m_meshShaderProgram = createProgram(phongVertexShaderSrc, phongFragmentShaderSrc);
@@ -241,11 +245,18 @@ void ModelViewerWidget::paintGL() {
 		glUseProgram(m_meshShaderProgram);
 
 		// Set default lighting values
-		float ambient[] = { 0.4f, 0.4f, 0.4f };
+		float ambient[] = { 0.2f, 0.2f, 0.2f };
 		float specular[] = { 0.7f, 0.7f, 0.7f };
-		float shininess = 32.0f;		
+		float shininess = 64.0f;		
 		QVector3D cpos = m_camera->getPosition();
-		float viewPos[] = { cpos.x(), cpos.y(), cpos.z() };
+		float viewPos[3] = { 0.0f, 0.0f, 0.0f };
+
+		QVector3D lightDirView = QVector3D(0.0f, 0.0f, m_cameraDistance); // +Z in eye space
+		float lightDir[3] = { lightDirView.x(), lightDirView.y(), lightDirView.z() };
+		glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "lightDir"), 1, lightDir);
+
+		GLint viewLoc = glGetUniformLocation(m_meshShaderProgram, "view");
+		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, m_viewMatrix.constData());
 		
 		glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "ambientColor"), 1, ambient);
 		glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "specularColor"), 1, specular);
@@ -288,11 +299,7 @@ void ModelViewerWidget::paintGL() {
 		drawNodeModern = [&](const ModernSceneNode& node, QMatrix4x4 parentTransform) {
 			QMatrix4x4 globalTransform = parentTransform * node.transform;
 			QMatrix4x4 mvp = m_projectionMatrix * m_viewMatrix * globalTransform;
-
-			QVector3D lightDirWorld = QVector3D(1.0f, 1.0f, 1.0f).normalized();
-			float lightDir[3] = { lightDirWorld.x(), lightDirWorld.y(), lightDirWorld.z() };
-			glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "lightDir"), 1, lightDir);
-
+						
 			for (int meshIdx : node.meshIndices) {
 				if (meshIdx < 0 || meshIdx >= int(m_modernMeshes.size())) continue;
 				const ModernMesh& mesh = m_modernMeshes[meshIdx];
