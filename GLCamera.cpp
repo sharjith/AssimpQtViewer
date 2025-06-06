@@ -151,9 +151,10 @@ void GLCamera::rotateX(float iAngle)
 
 	//Rotate viewdir around the right vector:
 	_viewDir = QVector3D(QVector3D(_viewDir * cos(iAngle * PIdiv180)) + _upVector * sin(iAngle * PIdiv180)).normalized();
-
+	_viewDir.normalize();
 	//now compute the new _upVector (by cross product)
 	_upVector = QVector3D::crossProduct(_viewDir, _rightVector) * -1;
+	_upVector.normalize();
 
 	updateViewMatrix();
 }
@@ -169,9 +170,10 @@ void GLCamera::rotateY(float iAngle)
 
 	//Rotate viewdir around the up vector:
 	_viewDir = QVector3D(QVector3D(_viewDir * cos(iAngle * PIdiv180)) - _rightVector * sin(iAngle * PIdiv180)).normalized();
-
+	_viewDir.normalize();
 	//now compute the new _rightVector (by cross product)
 	_rightVector = QVector3D::crossProduct(_viewDir, _upVector);
+	_rightVector.normalize();
 
 	updateViewMatrix();
 }
@@ -187,9 +189,10 @@ void GLCamera::rotateZ(float iAngle)
 
 	//Rotate viewdir around the right vector:
 	_rightVector = QVector3D(QVector3D(_rightVector * cos(iAngle * PIdiv180)) + _upVector * sin(iAngle * PIdiv180)).normalized();
-
+	_rightVector.normalize();
 	//now compute the new _upVector (by cross product)
 	_upVector = QVector3D::crossProduct(_viewDir, _rightVector) * -1;
+	_upVector.normalize();
 
 	updateViewMatrix();
 }
