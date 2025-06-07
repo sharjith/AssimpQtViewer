@@ -26,6 +26,8 @@ set(SOURCES
     ModelViewerWidget.cpp    
     HighlightDelegate.cpp    
     GLCamera.cpp
+    GLMesh.cpp
+    ShaderProgram.cpp
     Resource.qrc
 )
 
@@ -34,6 +36,8 @@ set(HEADERS
     ModelViewerWidget.h    
     HighlightDelegate.h
     GLCamera.h
+    GLMesh.h
+    ShaderProgram.h
     AssimpProgressHandler.h
 )
 
