@@ -183,12 +183,13 @@ void ModelViewerWidget::initializeGL() {
 		"uniform vec3 ambientColor;\n"
 		"uniform vec3 specularColor;\n"
 		"uniform float shininess;\n"
+		"uniform vec3 viewPos;\n"
 		"uniform vec3 lightDir;\n"
 		"out vec4 fragColor;\n"
 		"void main() {\n"
 		"    vec3 norm = normalize(fragNormal);\n"
 		"    vec3 L = normalize(lightDir);\n"
-		"    vec3 V = normalize(-fragPos);\n"
+		"    vec3 V = normalize(viewPos -fragPos);\n"
 		"    float ndotv = max(dot(norm, V), 0.0);\n"
 		"    float diff = max(dot(norm, L), 0.0);\n"
 		"    vec3 ambient = ambientColor * color.rgb;\n"
@@ -230,103 +231,95 @@ void ModelViewerWidget::resizeGL(int w, int h) {
 }
 
 void ModelViewerWidget::paintGL() {
-	glViewport(0, 0, width(), height());
+    glViewport(0, 0, width(), height());
+    glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	drawGradientBackground();	
+    m_viewMatrix = m_camera->getViewMatrix();
+    m_projectionMatrix = m_camera->getProjectionMatrix();
 
-	glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
-	m_viewMatrix = m_camera->getViewMatrix();
-	m_projectionMatrix = m_camera->getProjectionMatrix();
+    if (!m_modernMeshes.empty()) {
+        glUseProgram(m_meshShaderProgram);
 
-	if (!m_modernMeshes.empty()) {
-
-		glUseProgram(m_meshShaderProgram);
-
-		// Set default lighting values
-		float ambient[] = { 0.2f, 0.2f, 0.2f };
-		float specular[] = { 0.7f, 0.7f, 0.7f };
-		float shininess = 64.0f;		
-		QVector3D cpos = m_camera->getPosition();
-		float viewPos[3] = { 0.0f, 0.0f, 0.0f };
-
-		QVector3D lightDirView = QVector3D(0.0f, 0.0f, m_cameraDistance); // +Z in eye space
-		float lightDir[3] = { lightDirView.x(), lightDirView.y(), lightDirView.z() };
-		glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "lightDir"), 1, lightDir);
-
-		GLint viewLoc = glGetUniformLocation(m_meshShaderProgram, "view");
-		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, m_viewMatrix.constData());
-		
-		glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "ambientColor"), 1, ambient);
-		glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "specularColor"), 1, specular);
-		glUniform1f(glGetUniformLocation(m_meshShaderProgram, "shininess"), shininess);
-		
-		glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "viewPos"), 1, viewPos);
-
-		GLint mvpLoc = glGetUniformLocation(m_meshShaderProgram, "mvp");
-		GLint modelLoc = glGetUniformLocation(m_meshShaderProgram, "model");
+        // Fixed lighting setup
+        float ambient[] = { 0.2f, 0.2f, 0.2f };
+        float lightDirWorld[3] = { 0.577f, 0.577f, 0.577f }; // Normalized (1,1,1)
+        float specular[] = { 0.7f, 0.7f, 0.7f };
+        float shininess = 64.0f;
+    	QVector3D viewPositionWorld = m_camera->getPosition(); // or eye position in world space
+    	float viewPos[3] = { viewPositionWorld.x(), viewPositionWorld.y(), viewPositionWorld.z() };
 
 
-		for (ModernMesh& modernMesh : m_modernMeshes) {
-			if (modernMesh.vao == 0) {
-				// OpenGL upload
-				glGenVertexArrays(1, &modernMesh.vao);
-				glBindVertexArray(modernMesh.vao);
+        glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "lightDir"), 1, lightDirWorld);
+        glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "ambientColor"), 1, ambient);
+        glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "specularColor"), 1, specular);
+        glUniform1f(glGetUniformLocation(m_meshShaderProgram, "shininess"), shininess);
+        glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "viewPos"), 1, viewPos);
 
-				glGenBuffers(1, &modernMesh.vbo);
-				glBindBuffer(GL_ARRAY_BUFFER, modernMesh.vbo);
-				glBufferData(GL_ARRAY_BUFFER, modernMesh.vertexData.size() * sizeof(float), modernMesh.vertexData.data(), GL_STATIC_DRAW);
+        glUniformMatrix4fv(glGetUniformLocation(m_meshShaderProgram, "view"), 1, GL_FALSE, m_viewMatrix.constData());
 
-				glGenBuffers(1, &modernMesh.ebo);
-				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modernMesh.ebo);
-				glBufferData(GL_ELEMENT_ARRAY_BUFFER, modernMesh.indices.size() * sizeof(unsigned int), modernMesh.indices.data(), GL_STATIC_DRAW);
-				
-				// Attribute layout: pos(3), normal(3), texcoord(2)
-				int stride = 8 * sizeof(float);
-				glEnableVertexAttribArray(0); // position
-				glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
-				glEnableVertexAttribArray(1); // normal
-				glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
-				glEnableVertexAttribArray(2); // texcoord
-				glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
+        GLint mvpLoc = glGetUniformLocation(m_meshShaderProgram, "mvp");
+        GLint modelLoc = glGetUniformLocation(m_meshShaderProgram, "model");
+        GLint normalMatrixLoc = glGetUniformLocation(m_meshShaderProgram, "normalMatrix");
 
-				glBindVertexArray(0);				
-			}
-		}
-		
-		std::function<void(const ModernSceneNode&, QMatrix4x4)> drawNodeModern;
-		drawNodeModern = [&](const ModernSceneNode& node, QMatrix4x4 parentTransform) {
-			QMatrix4x4 globalTransform = parentTransform * node.transform;
-			QMatrix4x4 mvp = m_projectionMatrix * m_viewMatrix * globalTransform;
-						
-			for (int meshIdx : node.meshIndices) {
-				if (meshIdx < 0 || meshIdx >= int(m_modernMeshes.size())) continue;
-				const ModernMesh& mesh = m_modernMeshes[meshIdx];
-				if (mesh.vao == 0 || mesh.indexCount == 0) continue;
+        for (ModernMesh& modernMesh : m_modernMeshes) {
+            if (modernMesh.vao == 0) {
+                glGenVertexArrays(1, &modernMesh.vao);
+                glBindVertexArray(modernMesh.vao);
 
-				GLint colorLoc = glGetUniformLocation(m_meshShaderProgram, "color");
-				float color[4] = { mesh.color.x(), mesh.color.y(), mesh.color.z(), mesh.color.w() };
-				glUniform4fv(colorLoc, 1, color);
+                glGenBuffers(1, &modernMesh.vbo);
+                glBindBuffer(GL_ARRAY_BUFFER, modernMesh.vbo);
+                glBufferData(GL_ARRAY_BUFFER, modernMesh.vertexData.size() * sizeof(float), modernMesh.vertexData.data(), GL_STATIC_DRAW);
 
-				glBindVertexArray(mesh.vao);
-				glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
-								
-				glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp.constData());
-				glUniformMatrix4fv(modelLoc, 1, GL_FALSE, globalTransform.constData());
-								
-				glDrawElements(GL_TRIANGLES, mesh.indexCount, GL_UNSIGNED_INT, 0);
+                glGenBuffers(1, &modernMesh.ebo);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modernMesh.ebo);
+                glBufferData(GL_ELEMENT_ARRAY_BUFFER, modernMesh.indices.size() * sizeof(unsigned int), modernMesh.indices.data(), GL_STATIC_DRAW);
 
-				glBindVertexArray(0);
-			}
-			for (const ModernSceneNode& child : node.children)
-				drawNodeModern(child, globalTransform);
-			};
+                int stride = 8 * sizeof(float);
+                glEnableVertexAttribArray(0);
+                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
+                glEnableVertexAttribArray(1);
+                glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+                glEnableVertexAttribArray(2);
+                glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
 
-		drawNodeModern(m_modernRootNode, QMatrix4x4());
-		glUseProgram(0);
-	}		
+                glBindVertexArray(0);
+            }
+        }
+
+        std::function<void(const ModernSceneNode&, QMatrix4x4)> drawNodeModern;
+        drawNodeModern = [&](const ModernSceneNode& node, QMatrix4x4 parentTransform) {
+            QMatrix4x4 globalTransform = parentTransform * node.transform;
+            QMatrix4x4 mvp = m_projectionMatrix * m_viewMatrix * globalTransform;
+            QMatrix3x3 normalMatrix = globalTransform.normalMatrix();
+
+            for (int meshIdx : node.meshIndices) {
+                if (meshIdx < 0 || meshIdx >= int(m_modernMeshes.size())) continue;
+                const ModernMesh& mesh = m_modernMeshes[meshIdx];
+                if (mesh.vao == 0 || mesh.indexCount == 0) continue;
+
+                float color[4] = { mesh.color.x(), mesh.color.y(), mesh.color.z(), mesh.color.w() };
+                glUniform4fv(glGetUniformLocation(m_meshShaderProgram, "color"), 1, color);
+
+                glBindVertexArray(mesh.vao);
+                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
+
+                glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp.constData());
+                glUniformMatrix4fv(modelLoc, 1, GL_FALSE, globalTransform.constData());
+                glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, normalMatrix.constData());
+
+                glDrawElements(GL_TRIANGLES, mesh.indexCount, GL_UNSIGNED_INT, 0);
+                glBindVertexArray(0);
+            }
+            for (const ModernSceneNode& child : node.children)
+                drawNodeModern(child, globalTransform);
+        };
+
+        drawNodeModern(m_modernRootNode, QMatrix4x4());
+        glUseProgram(0);
+    }
 }
+
 
 void ModelViewerWidget::updateCamera() {
 	// Update camera position based on the current rotation and zoom
@@ -1157,12 +1150,48 @@ aiNode* ModelViewerWidget::findNodeForMesh(aiNode* node, int meshIndex) {
 
 QVector3D ModelViewerWidget::get3dTranslationVectorFromMousePoints(const QPoint& start, const QPoint& end)
 {
-	QVector3D Z(0, 0, 0); // instead of 0 for x and y we need worldPosition.x() and worldPosition.y() ....
-	Z = Z.project(m_viewMatrix * m_modelMatrix, m_projectionMatrix, QRect(0, 0, width(), height()));
-	QVector3D p1(start.x(), height() - start.y(), Z.z());
-	QVector3D O = p1.unproject(m_viewMatrix * m_modelMatrix, m_projectionMatrix, QRect(0, 0, width(), height()));
-	QVector3D p2(end.x(), height() - end.y(), Z.z());
-	QVector3D P = p2.unproject(m_viewMatrix * m_modelMatrix, m_projectionMatrix, QRect(0, 0, width(), height()));
-	QVector3D OP = P - O;
-	return OP;
+	// Determine viewport and camera
+	QRect viewport(0,0,width(), height());
+	GLCamera* camera = m_camera;
+
+	// Get view and projection matrices
+	QMatrix4x4 view = camera->getViewMatrix();
+	QMatrix4x4 projection = camera->getProjectionMatrix();
+	QMatrix4x4 inv = (projection * view).inverted();
+
+	// Choose reference Z in world space
+	float referenceWorldZ = 0.0f;
+	if (camera->getProjectionType() == GLCamera::ProjectionType::ORTHOGRAPHIC) {
+		referenceWorldZ = m_viewCenter.z;
+	}
+	else {
+		QVector3D focusPoint = camera->getPosition() + camera->getViewDir();
+		referenceWorldZ = focusPoint.z();
+	}
+
+	// Project reference world point to get NDC Z
+	QVector4D refWorld(0, 0, referenceWorldZ, 1.0f);
+	QVector4D refClip = projection * view * refWorld;
+	float ndcZ = refClip.w() != 0.0f ? refClip.z() / refClip.w() : 0.0f;
+
+	// Helper to convert screen point to NDC
+	auto toNDC = [&](const QPoint& pt) {
+		int yInverted = height() - pt.y() - 1;
+		float ndcX = (2.0f * (pt.x() - viewport.x())) / viewport.width() - 1.0f;
+		float ndcY = (2.0f * (yInverted - viewport.y())) / viewport.height() - 1.0f;
+		return QVector2D(ndcX, ndcY);
+	};
+
+	QVector2D ndcStart2 = toNDC(start);
+	QVector2D ndcEnd2 = toNDC(end);
+
+	QVector4D ndcStart(ndcStart2.x(), ndcStart2.y(), ndcZ, 1.0f);
+	QVector4D ndcEnd(ndcEnd2.x(), ndcEnd2.y(), ndcZ, 1.0f);
+
+	QVector4D worldStart = inv * ndcStart;
+	QVector4D worldEnd = inv * ndcEnd;
+	if (worldStart.w() != 0.0f) worldStart /= worldStart.w();
+	if (worldEnd.w() != 0.0f) worldEnd /= worldEnd.w();
+
+	return worldEnd.toVector3D() - worldStart.toVector3D();
 }
