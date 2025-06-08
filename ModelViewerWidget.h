@@ -9,6 +9,8 @@
 #include <QString>
 #include <QToolButton>
 #include <QMatrix4x4>
+#include "GLMesh.h"
+#include "ShaderProgram.h"
 
 class GLCamera;
 
@@ -43,7 +45,7 @@ struct ModernSceneNode {
 };
 
 
-class ModelViewerWidget : public QOpenGLWidget, protected QOpenGLExtraFunctions {
+class ModelViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
     Q_OBJECT
 public:
     explicit ModelViewerWidget(QWidget *parent = nullptr);
@@ -162,4 +164,7 @@ private:
 
     std::vector<ModernMesh> m_modernMeshes;
     ModernSceneNode m_modernRootNode;
+
+    std::vector<std::unique_ptr<GLMesh>> m_glMeshes;
+    ShaderProgram m_shader;
 };

@@ -207,6 +207,9 @@ void ModelViewerWidget::initializeGL() {
 		"}\n";
 
 	m_meshShaderProgram = createProgram(phongVertexShaderSrc, phongFragmentShaderSrc);
+
+	m_shader.load("D:/work/progs/Qt6/AssimpQtViewer/shaders/basic.vert",
+		"D:/work/progs/Qt6/AssimpQtViewer/shaders/basic.frag");
 }
 
 void ModelViewerWidget::resizeGL(int w, int h) {
@@ -238,7 +241,8 @@ void ModelViewerWidget::paintGL() {
     m_viewMatrix = m_camera->getViewMatrix();
     m_projectionMatrix = m_camera->getProjectionMatrix();
 
-    if (!m_modernMeshes.empty()) {
+    /*
+	if (!m_modernMeshes.empty()) {
         glUseProgram(m_meshShaderProgram);
 
         // Fixed lighting setup
@@ -315,9 +319,23 @@ void ModelViewerWidget::paintGL() {
                 drawNodeModern(child, globalTransform);
         };
 
-        drawNodeModern(m_modernRootNode, QMatrix4x4());
-        glUseProgram(0);
+        //drawNodeModern(m_modernRootNode, QMatrix4x4());
+		
+		glUseProgram(0);
     }
+	*/
+
+	if(!m_glMeshes.empty()) {
+		m_shader.use();
+		m_shader.setUniform("view", m_viewMatrix);
+		m_shader.setUniform("projection", m_projectionMatrix);
+		m_shader.setUniform("viewPos", m_camera->getPosition());
+		for (const auto& mesh : m_glMeshes) {
+			m_shader.setUniform("model", mesh->modelMatrix());
+			mesh->draw();
+		}
+	}
+	
 }
 
 
@@ -510,6 +528,8 @@ void ModelViewerWidget::drawTrihedronOverlay() {
 
 void ModelViewerWidget::loadModel(const QString& filePath) {
 	
+	makeCurrent(); // Ensure OpenGL context is current
+
 	for (const ModernMesh& mesh : m_modernMeshes) {
 		if (mesh.vao) glDeleteVertexArrays(1, &mesh.vao);
 		if (mesh.vbo) glDeleteBuffers(1, &mesh.vbo);
@@ -530,6 +550,14 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 		return;
 	}
 
+	m_glMeshes.clear();
+	for (unsigned int i = 0; i < m_scene->mNumMeshes; ++i) {
+		aiMesh* mesh = m_scene->mMeshes[i];
+		m_glMeshes.emplace_back(std::make_unique<GLMesh>(mesh));
+	}
+
+	doneCurrent(); // Release OpenGL context
+	/*
 	m_modernMeshes.reserve(m_scene->mNumMeshes);
 
 	// --- Upload all meshes ---
@@ -616,6 +644,8 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 		return n;
 		};
 	m_modernRootNode = buildNode(m_scene->mRootNode);
+
+	*/
 
 	updateCamera();
 	update();
