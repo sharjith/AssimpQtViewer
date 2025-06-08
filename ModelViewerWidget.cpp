@@ -99,43 +99,6 @@ QToolButton* ModelViewerWidget::createViewButton(const QString& iconPath, const 
 	return button;
 }
 
-GLuint ModelViewerWidget::compileShader(GLenum type, const char* src) {
-	GLuint shader = glCreateShader(type);
-	glShaderSource(shader, 1, &src, nullptr);
-	glCompileShader(shader);
-	GLint status;
-	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
-	if (!status) {
-		char log[512];
-		glGetShaderInfoLog(shader, 512, nullptr, log);
-		qDebug() << "Shader compile error:" << log;
-		glDeleteShader(shader);
-		return 0;
-	}
-	return shader;
-}
-
-GLuint ModelViewerWidget::createProgram(const char* vsrc, const char* fsrc) {
-	GLuint vs = compileShader(GL_VERTEX_SHADER, vsrc);
-	GLuint fs = compileShader(GL_FRAGMENT_SHADER, fsrc);
-	GLuint prog = glCreateProgram();
-	glAttachShader(prog, vs);
-	glAttachShader(prog, fs);
-	glLinkProgram(prog);
-	glDeleteShader(vs);
-	glDeleteShader(fs);
-	GLint status;
-	glGetProgramiv(prog, GL_LINK_STATUS, &status);
-	if (!status) {
-		char log[512];
-		glGetProgramInfoLog(prog, 512, nullptr, log);
-		qDebug() << "Program link error:" << log;
-		glDeleteProgram(prog);
-		return 0;
-	}
-	return prog;
-}
-
 void ModelViewerWidget::initializeGL() {
 	initializeOpenGLFunctions();
 
@@ -156,58 +119,6 @@ void ModelViewerWidget::initializeGL() {
 
 
 	// Load shader sources (for demo, you can hardcode or load from file)
-
-	const char* phongVertexShaderSrc =
-		"#version 330 core\n"
-		"layout(location = 0) in vec3 position;\n"
-		"layout(location = 1) in vec3 normal;\n"
-		"layout(location = 2) in vec2 texcoord;\n"
-		"uniform mat4 mvp;\n"
-		"uniform mat4 model;\n"
-		"uniform mat4 view;\n"
-		"out vec3 fragNormal;\n"
-		"out vec3 fragPos;\n"
-		"void main() {\n"
-		"    vec4 viewPos4 = view * model * vec4(position, 1.0);\n"
-		"    fragPos = viewPos4.xyz;\n"
-		"    mat3 normalMatrix = transpose(inverse(mat3(view * model)));\n"
-		"    fragNormal = normalize(normalMatrix * normal);\n"
-		"    gl_Position = mvp * vec4(position, 1.0);\n"
-		"}\n";
-
-	const char* phongFragmentShaderSrc =
-		"#version 330 core\n"
-		"in vec3 fragNormal;\n"
-		"in vec3 fragPos;\n"
-		"uniform vec4 color;\n"
-		"uniform vec3 ambientColor;\n"
-		"uniform vec3 specularColor;\n"
-		"uniform float shininess;\n"
-		"uniform vec3 viewPos;\n"
-		"uniform vec3 lightDir;\n"
-		"out vec4 fragColor;\n"
-		"void main() {\n"
-		"    vec3 norm = normalize(fragNormal);\n"
-		"    vec3 L = normalize(lightDir);\n"
-		"    vec3 V = normalize(viewPos -fragPos);\n"
-		"    float ndotv = max(dot(norm, V), 0.0);\n"
-		"    float diff = max(dot(norm, L), 0.0);\n"
-		"    vec3 ambient = ambientColor * color.rgb;\n"
-		"    vec3 diffuse = diff * color.rgb;\n"
-		"    float spec = 0.0;\n"
-		"    if (diff > 0.0 && ndotv > 0.1) {\n"
-		"        vec3 H = normalize(L + V);\n"
-		"        float nh = max(dot(norm, H), 0.0);\n"
-		"        if (nh > 0.0)\n"
-		"            spec = pow(nh, shininess);\n"
-		"    }\n"
-		"    vec3 specular = specularColor * spec;\n"
-		"    vec3 result = ambient + diffuse + specular;\n"
-		"    fragColor = vec4(clamp(result, 0.0, 1.0), color.a);\n"
-		"}\n";
-
-	m_meshShaderProgram = createProgram(phongVertexShaderSrc, phongFragmentShaderSrc);
-
 	m_shader.load("D:/work/progs/Qt6/AssimpQtViewer/shaders/basic.vert",
 		"D:/work/progs/Qt6/AssimpQtViewer/shaders/basic.frag");
 }
@@ -240,91 +151,7 @@ void ModelViewerWidget::paintGL() {
 
     m_viewMatrix = m_camera->getViewMatrix();
     m_projectionMatrix = m_camera->getProjectionMatrix();
-
-    /*
-	if (!m_modernMeshes.empty()) {
-        glUseProgram(m_meshShaderProgram);
-
-        // Fixed lighting setup
-        float ambient[] = { 0.2f, 0.2f, 0.2f };
-        float lightDirWorld[3] = { 0.577f, 0.577f, 0.577f }; // Normalized (1,1,1)
-        float specular[] = { 0.7f, 0.7f, 0.7f };
-        float shininess = 64.0f;
-    	QVector3D viewPositionWorld = m_camera->getPosition(); // or eye position in world space
-    	float viewPos[3] = { viewPositionWorld.x(), viewPositionWorld.y(), viewPositionWorld.z() };
-
-
-        glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "lightDir"), 1, lightDirWorld);
-        glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "ambientColor"), 1, ambient);
-        glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "specularColor"), 1, specular);
-        glUniform1f(glGetUniformLocation(m_meshShaderProgram, "shininess"), shininess);
-        glUniform3fv(glGetUniformLocation(m_meshShaderProgram, "viewPos"), 1, viewPos);
-
-        glUniformMatrix4fv(glGetUniformLocation(m_meshShaderProgram, "view"), 1, GL_FALSE, m_viewMatrix.constData());
-
-        GLint mvpLoc = glGetUniformLocation(m_meshShaderProgram, "mvp");
-        GLint modelLoc = glGetUniformLocation(m_meshShaderProgram, "model");
-        GLint normalMatrixLoc = glGetUniformLocation(m_meshShaderProgram, "normalMatrix");
-
-        for (ModernMesh& modernMesh : m_modernMeshes) {
-            if (modernMesh.vao == 0) {
-                glGenVertexArrays(1, &modernMesh.vao);
-                glBindVertexArray(modernMesh.vao);
-
-                glGenBuffers(1, &modernMesh.vbo);
-                glBindBuffer(GL_ARRAY_BUFFER, modernMesh.vbo);
-                glBufferData(GL_ARRAY_BUFFER, modernMesh.vertexData.size() * sizeof(float), modernMesh.vertexData.data(), GL_STATIC_DRAW);
-
-                glGenBuffers(1, &modernMesh.ebo);
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, modernMesh.ebo);
-                glBufferData(GL_ELEMENT_ARRAY_BUFFER, modernMesh.indices.size() * sizeof(unsigned int), modernMesh.indices.data(), GL_STATIC_DRAW);
-
-                int stride = 8 * sizeof(float);
-                glEnableVertexAttribArray(0);
-                glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
-                glEnableVertexAttribArray(1);
-                glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
-                glEnableVertexAttribArray(2);
-                glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(6 * sizeof(float)));
-
-                glBindVertexArray(0);
-            }
-        }
-
-        std::function<void(const ModernSceneNode&, QMatrix4x4)> drawNodeModern;
-        drawNodeModern = [&](const ModernSceneNode& node, QMatrix4x4 parentTransform) {
-            QMatrix4x4 globalTransform = parentTransform * node.transform;
-            QMatrix4x4 mvp = m_projectionMatrix * m_viewMatrix * globalTransform;
-            QMatrix3x3 normalMatrix = globalTransform.normalMatrix();
-
-            for (int meshIdx : node.meshIndices) {
-                if (meshIdx < 0 || meshIdx >= int(m_modernMeshes.size())) continue;
-                const ModernMesh& mesh = m_modernMeshes[meshIdx];
-                if (mesh.vao == 0 || mesh.indexCount == 0) continue;
-
-                float color[4] = { mesh.color.x(), mesh.color.y(), mesh.color.z(), mesh.color.w() };
-                glUniform4fv(glGetUniformLocation(m_meshShaderProgram, "color"), 1, color);
-
-                glBindVertexArray(mesh.vao);
-                glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mesh.ebo);
-
-                glUniformMatrix4fv(mvpLoc, 1, GL_FALSE, mvp.constData());
-                glUniformMatrix4fv(modelLoc, 1, GL_FALSE, globalTransform.constData());
-                glUniformMatrix3fv(normalMatrixLoc, 1, GL_FALSE, normalMatrix.constData());
-
-                glDrawElements(GL_TRIANGLES, mesh.indexCount, GL_UNSIGNED_INT, 0);
-                glBindVertexArray(0);
-            }
-            for (const ModernSceneNode& child : node.children)
-                drawNodeModern(child, globalTransform);
-        };
-
-        //drawNodeModern(m_modernRootNode, QMatrix4x4());
-		
-		glUseProgram(0);
-    }
-	*/
-
+	
 	if(!m_glMeshes.empty()) {
 		m_shader.use();
 		m_shader.setUniform("view", m_viewMatrix);
@@ -530,14 +357,6 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 	
 	makeCurrent(); // Ensure OpenGL context is current
 
-	for (const ModernMesh& mesh : m_modernMeshes) {
-		if (mesh.vao) glDeleteVertexArrays(1, &mesh.vao);
-		if (mesh.vbo) glDeleteBuffers(1, &mesh.vbo);
-		if (mesh.ebo) glDeleteBuffers(1, &mesh.ebo);
-	}
-	m_modernMeshes.clear();
-	m_modernRootNode = ModernSceneNode();
-
 	m_scene = m_importer.ReadFile(filePath.toStdString(),
 		aiProcess_Triangulate | aiProcess_ValidateDataStructure |
 		aiProcess_CalcTangentSpace | aiProcess_GenSmoothNormals |
@@ -557,96 +376,7 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 	}
 
 	doneCurrent(); // Release OpenGL context
-	/*
-	m_modernMeshes.reserve(m_scene->mNumMeshes);
-
-	// --- Upload all meshes ---
-	for (unsigned int i = 0; i < m_scene->mNumMeshes; ++i) {
-		const aiMesh* mesh = m_scene->mMeshes[i];		
-		ModernMesh modernMesh;
-		modernMesh.name = mesh->mName.C_Str();
-		modernMesh.materialIndex = mesh->mMaterialIndex;
-
-		for (unsigned int v = 0; v < mesh->mNumVertices; ++v) {
-			// Position
-			modernMesh.vertexData.push_back(mesh->mVertices[v].x);
-			modernMesh.vertexData.push_back(mesh->mVertices[v].y);
-			modernMesh.vertexData.push_back(mesh->mVertices[v].z);
-			// Normal
-			if (mesh->HasNormals()) {
-				modernMesh.vertexData.push_back(mesh->mNormals[v].x);
-				modernMesh.vertexData.push_back(mesh->mNormals[v].y);
-				modernMesh.vertexData.push_back(mesh->mNormals[v].z);
-			}
-			else {
-				modernMesh.vertexData.push_back(0.0f);
-				modernMesh.vertexData.push_back(0.0f);
-				modernMesh.vertexData.push_back(0.0f);
-			}
-			// Texcoord (first channel)
-			if (mesh->HasTextureCoords(0)) {
-				modernMesh.vertexData.push_back(mesh->mTextureCoords[0][v].x);
-				modernMesh.vertexData.push_back(mesh->mTextureCoords[0][v].y);
-			}
-			else {
-				modernMesh.vertexData.push_back(0.0f);
-				modernMesh.vertexData.push_back(0.0f);
-			}
-		}
-
-		for (unsigned int f = 0; f < mesh->mNumFaces; ++f) {
-			const aiFace& face = mesh->mFaces[f];
-			for (unsigned int j = 0; j < face.mNumIndices; ++j) {
-				if (face.mIndices[j] >= mesh->mNumVertices) {
-					qDebug() << "Out-of-bounds index:" << face.mIndices[j] << "in mesh" << i;
-				}
-				modernMesh.indices.push_back(face.mIndices[j]);
-			}
-		}
-
-		aiColor4D diffuse(0.8f, 0.8f, 0.8f, 1.0f);
-		aiMaterial* material = m_scene->mMaterials[mesh->mMaterialIndex];
-		if (AI_SUCCESS == aiGetMaterialColor(material, AI_MATKEY_COLOR_DIFFUSE, &diffuse)) {
-			modernMesh.color = QVector4D(diffuse.r, diffuse.g, diffuse.b, diffuse.a);
-		}
-		else {
-			modernMesh.color = QVector4D(0.8f, 0.8f, 0.8f, 1.0f);
-		}
-				
-		modernMesh.indexCount = static_cast<int>(modernMesh.indices.size());
-				
-		for (size_t idx = 0; idx < modernMesh.indices.size(); ++idx) {
-			if (modernMesh.indices[idx] >= mesh->mNumVertices) {
-				qDebug() << "Out-of-bounds index:" << modernMesh.indices[idx] << "in mesh" << i;
-				break; // Stop after first error
-			}
-		}
-				
-		m_modernMeshes.push_back(std::move(modernMesh));
-	}
-
-	// --- Build scene graph ---
-	std::function<ModernSceneNode(const aiNode*)> buildNode = [&](const aiNode* node) -> ModernSceneNode {
-		ModernSceneNode n;
-		n.name = node->mName.C_Str();
-		// Convert aiMatrix4x4 to QMatrix4x4
-		const aiMatrix4x4& m = node->mTransformation;
-		n.transform = QMatrix4x4(
-			m.a1, m.b1, m.c1, m.d1,
-			m.a2, m.b2, m.c2, m.d2,
-			m.a3, m.b3, m.c3, m.d3,
-			m.a4, m.b4, m.c4, m.d4
-		);
-		for (unsigned int i = 0; i < node->mNumMeshes; ++i)
-			n.meshIndices.push_back(node->mMeshes[i]);
-		for (unsigned int i = 0; i < node->mNumChildren; ++i)
-			n.children.push_back(buildNode(node->mChildren[i]));
-		return n;
-		};
-	m_modernRootNode = buildNode(m_scene->mRootNode);
-
-	*/
-
+	
 	updateCamera();
 	update();
 }

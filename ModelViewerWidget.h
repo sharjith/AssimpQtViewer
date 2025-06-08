@@ -25,26 +25,6 @@ enum class ViewProjection {
     Custom
 };
 
-struct ModernMesh {
-    GLuint vao = 0;
-    GLuint vbo = 0;
-    GLuint ebo = 0;
-    std::vector<float> vertexData;
-    std::vector<unsigned int> indices;
-    int indexCount = 0;
-    int materialIndex = 0;
-    QString name;
-    QVector4D color;
-};
-
-struct ModernSceneNode {
-    QString name;
-    QMatrix4x4 transform;
-    std::vector<int> meshIndices; // Indices into a ModernMesh vector
-    std::vector<ModernSceneNode> children;
-};
-
-
 class ModelViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
     Q_OBJECT
 public:
@@ -107,10 +87,6 @@ private:
     
     QToolButton* createViewButton(const QString& iconPath, const QString& tooltip, const std::function<void()>& callback, QWidget* parent = nullptr);
 
-
-    GLuint compileShader(GLenum type, const char* src);
-    GLuint createProgram(const char* vsrc, const char* fsrc);
-
 private:
     const aiScene* m_scene = nullptr;
     aiNode* m_highlightedNode = nullptr;
@@ -161,9 +137,6 @@ private:
     GLuint m_testVao = 0, m_testVbo = 0;
 
     GLuint testMeshVAO = 0, testMeshVBO = 0, testMeshEBO = 0;
-
-    std::vector<ModernMesh> m_modernMeshes;
-    ModernSceneNode m_modernRootNode;
 
     std::vector<std::unique_ptr<GLMesh>> m_glMeshes;
     ShaderProgram m_shader;
