@@ -131,13 +131,6 @@ private:
     QMatrix4x4 m_modelMatrix; // Model matrix for transformations
     QMatrix4x4 m_projectionMatrix;     
 
-
-    GLuint m_meshShaderProgram = 0;
-    GLuint m_testShaderProgram = 0;
-    GLuint m_testVao = 0, m_testVbo = 0;
-
-    GLuint testMeshVAO = 0, testMeshVBO = 0, testMeshEBO = 0;
-
     std::vector<std::unique_ptr<GLMesh>> m_glMeshes;
     ShaderProgram m_shader;
 };

@@ -12,6 +12,7 @@ public:
     void use();
     void setUniform(const QString& name, const QMatrix4x4& value);
     void setUniform(const QString& name, const QVector3D& value);
+    void setUniform(const QString& name, const QVector4D& value);
     void setUniform(const QString& name, float value);
     void setUniform(const QString& name, int value);
     QOpenGLShaderProgram* program();

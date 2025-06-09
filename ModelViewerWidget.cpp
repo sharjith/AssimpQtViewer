@@ -151,13 +151,40 @@ void ModelViewerWidget::paintGL() {
 
     m_viewMatrix = m_camera->getViewMatrix();
     m_projectionMatrix = m_camera->getProjectionMatrix();
+
 	
 	if(!m_glMeshes.empty()) {
 		m_shader.use();
-		m_shader.setUniform("view", m_viewMatrix);
-		m_shader.setUniform("projection", m_projectionMatrix);
-		m_shader.setUniform("viewPos", m_camera->getPosition());
+
+		QVector3D lightColor(1.0f, 1.0f, 1.0f);
+		QVector3D lightPos(5.0f, 5.0f, 5.0f);
+		QVector3D ambient(0.4f, 0.4f, 0.4f);		
+		QVector3D specular(0.7f, 0.7f, 0.7f );
+		float shininess = 64.0f;
+		QVector3D lightDirWorld(0.577f, 0.577f, 0.577f); // Normalized (1,1,1)
+		QVector3D viewcenter(m_viewCenter.x, m_viewCenter.y, m_viewCenter.z);
+		QVector3D cameraTarget = viewcenter + lightDirWorld * m_viewRadius; // Target point in world space
+		QVector3D cameraPos = m_camera->getPosition(); // or eye position in world space
+		
+		QVector3D viewDir = cameraTarget - cameraPos;
+		viewDir.normalize();
+		m_shader.setUniform("lightDir", lightDirWorld);
+		m_shader.setUniform("viewPos", cameraPos);
+		m_shader.setUniform("lightColor", lightColor);
+		m_shader.setUniform("lightPos", lightPos);
+		m_shader.setUniform("ambientColor", ambient);
+		
+		m_shader.setUniform("specularColor", specular);
+		m_shader.setUniform("shininess", shininess);
+		
+		m_shader.setUniform("mvp", m_projectionMatrix * m_viewMatrix);
+		m_shader.setUniform("view", m_viewMatrix);		
+		
 		for (const auto& mesh : m_glMeshes) {
+			QVector4D diffuse(0.8f, 0.8f, 0.8f, 1.0f);
+			m_shader.setUniform("color", diffuse);
+			m_shader.setUniform("specularColor", mesh->m_material.specular);
+			m_shader.setUniform("shininess", mesh->m_material.shininess);
 			m_shader.setUniform("model", mesh->modelMatrix());
 			mesh->draw();
 		}
@@ -357,6 +384,11 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 	
 	makeCurrent(); // Ensure OpenGL context is current
 
+	if(m_scene) {
+		m_importer.FreeScene(); // Free previous scene if exists
+		m_scene = nullptr;
+	}
+
 	m_scene = m_importer.ReadFile(filePath.toStdString(),
 		aiProcess_Triangulate | aiProcess_ValidateDataStructure |
 		aiProcess_CalcTangentSpace | aiProcess_GenSmoothNormals |
@@ -372,11 +404,31 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 	m_glMeshes.clear();
 	for (unsigned int i = 0; i < m_scene->mNumMeshes; ++i) {
 		aiMesh* mesh = m_scene->mMeshes[i];
-		m_glMeshes.emplace_back(std::make_unique<GLMesh>(mesh));
-	}
+		GLMesh* glMesh = new GLMesh(mesh, m_shader.program());
 
-	doneCurrent(); // Release OpenGL context
-	
+		// Set up material
+		Material mat;
+		if (mesh->mMaterialIndex >= 0) {
+			aiMaterial* material = m_scene->mMaterials[mesh->mMaterialIndex];
+
+			aiColor4D c;
+			if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_AMBIENT, c))
+				mat.ambient = QVector4D(c.r, c.g, c.b, c.a);
+			if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_DIFFUSE, c))
+				mat.diffuse = QVector4D(c.r, c.g, c.b, c.a);
+			if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_SPECULAR, c))
+				mat.specular = QVector4D(c.r, c.g, c.b, c.a);
+			float shininess = 0.0f;
+			if (AI_SUCCESS == material->Get(AI_MATKEY_SHININESS, shininess))
+				mat.shininess = shininess;
+		}
+
+		glMesh->setMaterial(mat); // Store material in mesh
+		glMesh->setupMesh(); // Initialize OpenGL buffers
+
+		m_glMeshes.emplace_back(glMesh);
+	}
+		
 	updateCamera();
 	update();
 }

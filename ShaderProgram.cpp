@@ -35,6 +35,10 @@ void ShaderProgram::setUniform(const QString& name, const QVector3D& value) {
     m_program.setUniformValue(name.toUtf8().data(), value);
 }
 
+void ShaderProgram::setUniform(const QString& name, const QVector4D& value) {
+    m_program.setUniformValue(name.toUtf8().data(), value);
+}
+
 void ShaderProgram::setUniform(const QString& name, float value) {
     m_program.setUniformValue(name.toUtf8().data(), value);
 }
