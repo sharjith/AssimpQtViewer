@@ -119,11 +119,11 @@ void ModelViewerWidget::initializeGL() {
 
 
 	// Load shader sources (for demo, you can hardcode or load from file)
-	m_shader.load("D:/Sharjith/work/progs/Qt6/AssimpQtViewer/shaders/basic.vert",
-		"D:/Sharjith/work/progs/Qt6/AssimpQtViewer/shaders/basic.frag");
+	m_shader.load(":/shaders/shaders/basic.vert",
+		":/shaders/shaders/basic.frag");
 
-	m_backgroundShader.load("D:/Sharjith/work/progs/Qt6/AssimpQtViewer/shaders/gradientbg.vert",
-		"D:/Sharjith/work/progs/Qt6/AssimpQtViewer/shaders/gradientbg.frag");
+	m_backgroundShader.load(":/shaders/shaders/gradientbg.vert",
+		":/shaders/shaders/gradientbg.frag");
 }
 
 void ModelViewerWidget::resizeGL(int w, int h) {
