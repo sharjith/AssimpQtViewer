@@ -119,8 +119,8 @@ void ModelViewerWidget::initializeGL() {
 
 
 	// Load shader sources (for demo, you can hardcode or load from file)
-	m_shader.load("D:/work/progs/Qt6/AssimpQtViewer/shaders/basic.vert",
-		"D:/work/progs/Qt6/AssimpQtViewer/shaders/basic.frag");
+	m_shader.load("D:/Sharjith/work/progs/Qt6/AssimpQtViewer/shaders/basic.vert",
+		"D:/Sharjith/work/progs/Qt6/AssimpQtViewer/shaders/basic.frag");
 }
 
 void ModelViewerWidget::resizeGL(int w, int h) {
@@ -145,27 +145,26 @@ void ModelViewerWidget::resizeGL(int w, int h) {
 }
 
 void ModelViewerWidget::paintGL() {
-    glViewport(0, 0, width(), height());
-    glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glViewport(0, 0, width(), height());
+	glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    m_viewMatrix = m_camera->getViewMatrix();
-    m_projectionMatrix = m_camera->getProjectionMatrix();
+	m_viewMatrix = m_camera->getViewMatrix();
+	m_projectionMatrix = m_camera->getProjectionMatrix();
 
-	
-	if(!m_glMeshes.empty()) {
+
+	if (!m_glMeshes.empty()) {
 		m_shader.use();
 
 		QVector3D lightColor(1.0f, 1.0f, 1.0f);
 		QVector3D lightPos(5.0f, 5.0f, 5.0f);
-		QVector3D ambient(0.4f, 0.4f, 0.4f);		
-		QVector3D specular(0.7f, 0.7f, 0.7f );
-		float shininess = 64.0f;
-		QVector3D lightDirWorld(0.577f, 0.577f, 0.577f); // Normalized (1,1,1)
-		QVector3D viewcenter(m_viewCenter.x, m_viewCenter.y, m_viewCenter.z);
-		QVector3D cameraTarget = viewcenter + lightDirWorld * m_viewRadius; // Target point in world space
+		QVector3D ambient(0.2f, 0.2f, 0.2f);		
+		float shininess = 128.0f;
+
+		QVector3D lightDirWorld(0.577f, 0.577f, 0.577f); // Normalized (1,1,1)		
+		QVector3D cameraTarget = m_viewCenter + lightDirWorld * m_viewRadius; // Target point in world space
 		QVector3D cameraPos = m_camera->getPosition(); // or eye position in world space
-		
+
 		QVector3D viewDir = cameraTarget - cameraPos;
 		viewDir.normalize();
 		m_shader.setUniform("lightDir", lightDirWorld);
@@ -173,23 +172,21 @@ void ModelViewerWidget::paintGL() {
 		m_shader.setUniform("lightColor", lightColor);
 		m_shader.setUniform("lightPos", lightPos);
 		m_shader.setUniform("ambientColor", ambient);
-		
-		m_shader.setUniform("specularColor", specular);
+				
 		m_shader.setUniform("shininess", shininess);
-		
+
 		m_shader.setUniform("mvp", m_projectionMatrix * m_viewMatrix);
-		m_shader.setUniform("view", m_viewMatrix);		
-		
+		m_shader.setUniform("view", m_viewMatrix);
+
 		for (const auto& mesh : m_glMeshes) {
 			QVector4D diffuse(0.8f, 0.8f, 0.8f, 1.0f);
 			m_shader.setUniform("color", diffuse);
-			m_shader.setUniform("specularColor", mesh->m_material.specular);
-			m_shader.setUniform("shininess", mesh->m_material.shininess);
+			m_shader.setUniform("specularColor", mesh->m_material.specular);			
 			m_shader.setUniform("model", mesh->modelMatrix());
 			mesh->draw();
 		}
 	}
-	
+
 }
 
 
@@ -205,7 +202,9 @@ void ModelViewerWidget::updateCamera() {
 	aiMatrix4x4 identity;
 	computeBoundingBox(m_scene, m_scene->mRootNode, minimum, maximum, identity);
 	float maxExtent = std::max({ maximum.x - minimum.x, maximum.y - minimum.y, maximum.z - minimum.z });
-	m_viewCenter = (maximum + minimum) * 0.5f;
+	QVector3D max(maximum.x, maximum.y, maximum.z);
+	QVector3D min(minimum.x, minimum.y, minimum.z);
+	m_viewCenter = (max + min) * 0.5f;
 	m_viewRadius = maxExtent * 0.5f;
 
 	// Ideal distance from camera to model center based on FOV
@@ -213,12 +212,12 @@ void ModelViewerWidget::updateCamera() {
 	m_cameraDistance = m_viewRadius / std::tan(fovYRadians * 0.5f);
 
 	// Final camera position offset along Z axis (behind object)
-	QVector3D center(m_viewCenter.x, m_viewCenter.y, m_viewCenter.z);
+	QVector3D center = m_viewCenter;
 	QVector3D camPos = center + QVector3D(0, 0, m_cameraDistance);
 
 	m_camera->setViewRange(m_viewRadius * 2.1f);
 
-	QVector3D viewPos(m_viewCenter.x, m_viewCenter.y, m_viewCenter.z);
+	QVector3D viewPos = m_viewCenter;
 	m_camera->setPosition(viewPos);
 
 	m_viewMatrix = m_camera->getViewMatrix();
@@ -680,7 +679,7 @@ void ModelViewerWidget::resizeEvent(QResizeEvent* event) {
 
 void ModelViewerWidget::resetView() {
 	m_cameraDistance = 0.0f;
-	m_viewCenter = aiVector3D(0, 0, 0);
+	m_viewCenter = QVector3D(0, 0, 0);
 	m_viewRadius = 1.0f;
 }
 
@@ -974,7 +973,7 @@ QVector3D ModelViewerWidget::get3dTranslationVectorFromMousePoints(const QPoint&
 	// Choose reference Z in world space
 	float referenceWorldZ = 0.0f;
 	if (camera->getProjectionType() == GLCamera::ProjectionType::ORTHOGRAPHIC) {
-		referenceWorldZ = m_viewCenter.z;
+		referenceWorldZ = m_viewCenter.z();
 	}
 	else {
 		QVector3D focusPoint = camera->getPosition() + camera->getViewDir();

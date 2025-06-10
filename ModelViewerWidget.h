@@ -94,9 +94,9 @@ private:
 
 	GLCamera* m_camera = nullptr; // Custom camera class for handling camera operations
 
-    aiVector3D m_cameraPos;   // Current camera position
-    aiVector3D m_viewCenter;  // Model center point
-    aiVector3D m_upVector;    // Up direction for the camera (usually (0,1,0))
+    QVector3D m_cameraPos;   // Current camera position
+    QVector3D m_viewCenter;  // Model center point
+    QVector3D m_upVector;    // Up direction for the camera (usually (0,1,0))
     
     float m_viewRadius;
     float m_cameraDistance;
