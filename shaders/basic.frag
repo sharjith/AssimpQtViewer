@@ -52,10 +52,10 @@ void main() {
         vec3 H = normalize(L + V);
         float nh = max(dot(norm, H), 0.0);
         if (nh > 0.0) {
-            spec = pow(nh, shininess);
+            spec = pow(nh, shininess) * 1.3; // Boost primary specular by 30%
             
-            // Add subtle secondary specular highlight
-            float secondarySpec = pow(nh, shininess * 0.3) * 0.3;
+            // Add stronger secondary specular highlight
+            float secondarySpec = pow(nh, shininess * 0.3) * 0.5; // Increased from 0.3 to 0.5
             spec += secondarySpec;
         }
     }
