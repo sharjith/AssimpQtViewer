@@ -130,6 +130,7 @@ void ModelViewerWidget::initializeGL() {
 
 	generateCylinderGeometry();
 	generateConeGeometry();
+	generateSphereGeometry();
 }
 
 void ModelViewerWidget::resizeGL(int w, int h) {
@@ -324,7 +325,7 @@ void ModelViewerWidget::drawGradientBackground() {
 }
 
 void ModelViewerWidget::generateCylinderGeometry() {
-	std::vector<float> vertices;
+	std::vector<float> vertexData;
 	const int segments = 12;
 	const float radius = 0.05f;
 	const float height = 1.0f;
@@ -334,17 +335,98 @@ void ModelViewerWidget::generateCylinderGeometry() {
 		float x = radius * cos(angle);
 		float y = radius * sin(angle);
 
-		// Bottom circle
-		vertices.push_back(x);
-		vertices.push_back(y);
-		vertices.push_back(0.0f);
+		// Normal for side surface (same for top and bottom at given x,y)
+		float nx = cos(angle);
+		float ny = sin(angle);
+		float nz = 0.0f;
 
-		// Top circle
-		vertices.push_back(x);
-		vertices.push_back(y);
-		vertices.push_back(height);
+		// Bottom vertex
+		vertexData.push_back(x);      // position
+		vertexData.push_back(y);
+		vertexData.push_back(0.0f);
+		vertexData.push_back(nx);     // normal
+		vertexData.push_back(ny);
+		vertexData.push_back(nz);
+
+		// Top vertex
+		vertexData.push_back(x);
+		vertexData.push_back(y);
+		vertexData.push_back(height);
+		vertexData.push_back(nx);
+		vertexData.push_back(ny);
+		vertexData.push_back(nz);
 	}
-	m_cylinderVertexCount = vertices.size() / 3;
+
+	// ADD: Base cap vertices with blended normals
+	float blendFactor = 0.6f; // Adjust this (0.0 = pure axial, 1.0 = pure radial)
+
+	// Bottom cap center
+	vertexData.push_back(0.0f);
+	vertexData.push_back(0.0f);
+	vertexData.push_back(0.0f);
+	vertexData.push_back(0.0f);     // blended normal
+	vertexData.push_back(0.0f);
+	vertexData.push_back(-1.0f + blendFactor * 0.5f); // slightly less downward
+
+	// Bottom cap rim vertices
+	for (int i = 0; i <= segments; ++i) {
+		float angle = 2.0f * M_PI * i / segments;
+		float x = radius * cos(angle);
+		float y = radius * sin(angle);
+
+		// Blended normal: mix radial and axial components
+		float nx = blendFactor * cos(angle);
+		float ny = blendFactor * sin(angle);
+		float nz = -(1.0f - blendFactor); // negative for bottom face
+
+		// Normalize the blended normal
+		float length = sqrt(nx * nx + ny * ny + nz * nz);
+		nx /= length;
+		ny /= length;
+		nz /= length;
+
+		vertexData.push_back(x);
+		vertexData.push_back(y);
+		vertexData.push_back(0.0f);
+		vertexData.push_back(nx);
+		vertexData.push_back(ny);
+		vertexData.push_back(nz);
+	}
+
+	// Top cap center
+	vertexData.push_back(0.0f);
+	vertexData.push_back(0.0f);
+	vertexData.push_back(height);
+	vertexData.push_back(0.0f);
+	vertexData.push_back(0.0f);
+	vertexData.push_back(1.0f - blendFactor * 0.5f); // slightly less upward
+
+	// Top cap rim vertices
+	for (int i = 0; i <= segments; ++i) {
+		float angle = 2.0f * M_PI * i / segments;
+		float x = radius * cos(angle);
+		float y = radius * sin(angle);
+
+		// Blended normal: mix radial and axial components
+		float nx = blendFactor * cos(angle);
+		float ny = blendFactor * sin(angle);
+		float nz = (1.0f - blendFactor); // positive for top face
+
+		// Normalize the blended normal
+		float length = sqrt(nx * nx + ny * ny + nz * nz);
+		nx /= length;
+		ny /= length;
+		nz /= length;
+
+		vertexData.push_back(x);
+		vertexData.push_back(y);
+		vertexData.push_back(height);
+		vertexData.push_back(nx);
+		vertexData.push_back(ny);
+		vertexData.push_back(nz);
+	}
+
+	m_cylinderVertexCount = (int)vertexData.size() / 6; // 3 pos + 3 normal
 
 	// Generate VAO/VBO
 	GLuint VBO;
@@ -353,40 +435,78 @@ void ModelViewerWidget::generateCylinderGeometry() {
 
 	glBindVertexArray(m_cylinderVAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, vertexData.size() * sizeof(float), vertexData.data(), GL_STATIC_DRAW);
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	// Position attribute
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
+
+	// Normal attribute
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
 
 	glBindVertexArray(0);
 }
 
 void ModelViewerWidget::generateConeGeometry() {
-	std::vector<float> vertices;
+	std::vector<float> vertexData;
 	const int segments = 12;
 	const float radius = 0.1f;
 	const float height = 0.2f;
 
-	// Cone base
-	vertices.push_back(0.0f); // Center of base
-	vertices.push_back(0.0f);
-	vertices.push_back(0.0f);
-
+	// ===== Base Circle (flat face) =====
 	for (int i = 0; i <= segments; ++i) {
 		float angle = 2.0f * M_PI * i / segments;
 		float x = radius * cos(angle);
 		float y = radius * sin(angle);
-		vertices.push_back(x);
-		vertices.push_back(y);
-		vertices.push_back(0.0f);
+
+		// Center of base (normal pointing -Z)
+		vertexData.push_back(0.0f);
+		vertexData.push_back(0.0f);
+		vertexData.push_back(0.0f);
+		vertexData.push_back(0.0f);
+		vertexData.push_back(0.0f);
+		vertexData.push_back(-1.0f);
+
+		// Perimeter point of base
+		vertexData.push_back(x);
+		vertexData.push_back(y);
+		vertexData.push_back(0.0f);
+		vertexData.push_back(0.0f);
+		vertexData.push_back(0.0f);
+		vertexData.push_back(-1.0f);
 	}
 
-	// Cone tip
-	vertices.push_back(0.0f); // Tip of cone
-	vertices.push_back(0.0f);
-	vertices.push_back(height);
+	// ===== Side Surface =====
+	for (int i = 0; i <= segments; ++i) {
+		float angle = 2.0f * M_PI * i / segments;
+		float x = radius * cos(angle);
+		float y = radius * sin(angle);
 
-	m_coneVertexCount = vertices.size() / 3;
+		// Vector from cone tip to perimeter point
+		float len = std::sqrt(x * x + y * y + height * height);
+		float nx = x / len;
+		float ny = y / len;
+		float nz = radius / len; // From side normal of cone
+
+		// Tip of the cone
+		vertexData.push_back(0.0f);
+		vertexData.push_back(0.0f);
+		vertexData.push_back(height);
+		vertexData.push_back(nx);
+		vertexData.push_back(ny);
+		vertexData.push_back(nz);
+
+		// Perimeter point of base
+		vertexData.push_back(x);
+		vertexData.push_back(y);
+		vertexData.push_back(0.0f);
+		vertexData.push_back(nx);
+		vertexData.push_back(ny);
+		vertexData.push_back(nz);
+	}
+
+	m_coneVertexCount = static_cast<int>(vertexData.size()) / 6; // 3 position + 3 normal
 
 	// Generate VAO/VBO
 	GLuint VBO;
@@ -395,33 +515,129 @@ void ModelViewerWidget::generateConeGeometry() {
 
 	glBindVertexArray(m_coneVAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, vertexData.size() * sizeof(float), vertexData.data(), GL_STATIC_DRAW);
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	// Position attribute
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
+
+	// Normal attribute
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
 
 	glBindVertexArray(0);
 }
 
+void ModelViewerWidget::generateSphereGeometry() {
+	std::vector<float> vertexData;
+	std::vector<unsigned int> indices;
+	float radius = 0.1f;
+	int latitudeSegments = 12;
+	int longitudeSegments = 12;
+
+	vertexData.clear();
+	indices.clear();
+
+	// Generate vertices
+	for (int lat = 0; lat <= latitudeSegments; ++lat) {
+		float theta = M_PI * lat / latitudeSegments; // 0 to PI (top to bottom)
+		float sinTheta = sin(theta);
+		float cosTheta = cos(theta);
+
+		for (int lon = 0; lon <= longitudeSegments; ++lon) {
+			float phi = 2.0f * M_PI * lon / longitudeSegments; // 0 to 2PI (around)
+			float sinPhi = sin(phi);
+			float cosPhi = cos(phi);
+
+			// Calculate position
+			float x = radius * sinTheta * cosPhi;
+			float y = radius * cosTheta;
+			float z = radius * sinTheta * sinPhi;
+
+			// Normal is the same as normalized position for a sphere centered at origin
+			float nx = sinTheta * cosPhi;
+			float ny = cosTheta;
+			float nz = sinTheta * sinPhi;
+
+			// Add vertex data (position + normal)
+			vertexData.push_back(x);   // position
+			vertexData.push_back(y);
+			vertexData.push_back(z);
+			vertexData.push_back(nx);  // normal
+			vertexData.push_back(ny);
+			vertexData.push_back(nz);
+		}
+	}
+
+	// Generate indices for triangles
+	for (int lat = 0; lat < latitudeSegments; ++lat) {
+		for (int lon = 0; lon < longitudeSegments; ++lon) {
+			int current = lat * (longitudeSegments + 1) + lon;
+			int next = current + longitudeSegments + 1;
+
+			// First triangle
+			indices.push_back(current);
+			indices.push_back(next);
+			indices.push_back(current + 1);
+
+			// Second triangle
+			indices.push_back(current + 1);
+			indices.push_back(next);
+			indices.push_back(next + 1);
+		}
+	}
+
+	m_sphereIndexCount = indices.size();
+
+	// Create and bind VAO
+	glGenVertexArrays(1, &m_sphereVAO);
+	glBindVertexArray(m_sphereVAO);
+
+	// Create and bind VBO
+	glGenBuffers(1, &m_sphereVBO);
+	glBindBuffer(GL_ARRAY_BUFFER, m_sphereVBO);
+	glBufferData(GL_ARRAY_BUFFER, vertexData.size() * sizeof(float),
+		vertexData.data(), GL_STATIC_DRAW);
+
+	// Create and bind EBO
+	glGenBuffers(1, &m_sphereEBO);
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_sphereEBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, vertexData.size() * sizeof(unsigned int),
+		indices.data(), GL_STATIC_DRAW);
+
+	// Set up vertex attributes (assuming same layout as cylinder)
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+
+	glBindVertexArray(0);
+}
+
+
 void ModelViewerWidget::drawCylinder(const QMatrix4x4& model) {
-	m_trihedronShader.use();
+	
 	m_trihedronShader.setUniform("uModel", model);
 
 	glBindVertexArray(m_cylinderVAO);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, m_cylinderVertexCount);
-	glBindVertexArray(0);
-	m_trihedronShader.release();
+	glBindVertexArray(0);	
 }
 
 void ModelViewerWidget::drawCone(const QMatrix4x4& model) {
-	m_trihedronShader.use();
+	
 	m_trihedronShader.setUniform("uModel", model);
 
 	glBindVertexArray(m_coneVAO);
 	glDrawArrays(GL_TRIANGLE_FAN, 0, m_coneVertexCount);
 	glBindVertexArray(0);
+}
 
-	m_trihedronShader.release();
+void ModelViewerWidget::drawSphere(const QMatrix4x4& model) {
+	m_trihedronShader.setUniform("uModel", model);
+	glBindVertexArray(m_sphereVAO);
+	glDrawElements(GL_TRIANGLES, m_sphereIndexCount, GL_UNSIGNED_INT, 0);
+	glBindVertexArray(0);
 }
 
 void ModelViewerWidget::drawTrihedron(const QMatrix4x4& view, const QMatrix4x4& projection) {
@@ -430,8 +646,13 @@ void ModelViewerWidget::drawTrihedron(const QMatrix4x4& view, const QMatrix4x4& 
 	// Set view and projection matrices
 	m_trihedronShader.setUniform("uView", view);
 	m_trihedronShader.setUniform("uProjection", projection);
-
+	m_trihedronShader.setUniform("viewPos", m_camera->getPosition());
 	QMatrix4x4 model;
+
+	// Draw center sphere
+	model.setToIdentity();
+	m_trihedronShader.setUniform("uColor", QVector3D(1.0f, 1.0f, 1.0f)); // White
+	drawSphere(model);
 
 	// Draw X-axis (Red)
 	model.setToIdentity();
@@ -447,7 +668,7 @@ void ModelViewerWidget::drawTrihedron(const QMatrix4x4& view, const QMatrix4x4& 
 	// Draw Y-axis (Green)
 	model.setToIdentity();
 	model.rotate(-90, 1, 0, 0); // Rotate to align with Y-axis
-	m_trihedronShader.setUniform("uColor", QVector3D(0.0f, 1.0f, 0.0f)); // Green
+	m_trihedronShader.setUniform("uColor", QVector3D(0.0f, 0.75f, 0.0f)); // Green
 	drawCylinder(model);
 
 	model.setToIdentity(); // Reset model matrix
@@ -468,12 +689,13 @@ void ModelViewerWidget::drawTrihedron(const QMatrix4x4& view, const QMatrix4x4& 
 
 
 void ModelViewerWidget::drawTrihedronOverlay() {
-	const int overlaySize = 100; // Size of mini viewport
+	const int overlaySize = 110; // Size of mini viewport
 	const int margin = 10;      // Margin from the bottom-left corner
 
 	// Set up the mini viewport
 	glViewport(margin, margin, overlaySize, overlaySize);
 	glClear(GL_DEPTH_BUFFER_BIT); // Clear depth buffer for the overlay
+	glEnable(GL_DEPTH_TEST); // Enable depth testing for the overlay
 
 	// Create projection matrix
 	QMatrix4x4 projection;
@@ -508,6 +730,7 @@ void ModelViewerWidget::drawTrihedronOverlay() {
 	// Restore the viewport to the main scene
 	glViewport(0, 0, width(), height());
 }
+
 
 void ModelViewerWidget::loadModel(const QString& filePath) {
 	

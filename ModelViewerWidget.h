@@ -62,8 +62,10 @@ private:
     void drawGradientBackground();
     void generateCylinderGeometry();
     void generateConeGeometry();
+    void generateSphereGeometry();
     void drawCylinder(const QMatrix4x4& model);
     void drawCone(const QMatrix4x4& model);
+    void drawSphere(const QMatrix4x4& model);
     void drawTrihedron(const QMatrix4x4& view, const QMatrix4x4& projection);
     void drawTrihedronOverlay();
     GLuint loadTextureIfNeeded(const aiMaterial* material, unsigned int materialIndex);
@@ -97,7 +99,10 @@ private:
     Assimp::Importer m_importer;    
 
     GLuint m_cylinderVAO, m_coneVAO;
-    int m_cylinderVertexCount, m_coneVertexCount;
+    GLuint m_sphereVAO;
+    GLuint m_sphereVBO;
+    GLuint m_sphereEBO;
+    int m_cylinderVertexCount, m_coneVertexCount, m_sphereIndexCount;
 
 	GLCamera* m_camera = nullptr; // Custom camera class for handling camera operations
 
