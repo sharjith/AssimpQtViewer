@@ -739,6 +739,7 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 	if(m_scene) {
 		m_importer.FreeScene(); // Free previous scene if exists
 		m_scene = nullptr;
+		m_glMeshes.clear();
 	}
 
 	m_scene = m_importer.ReadFile(filePath.toStdString(),
@@ -752,8 +753,7 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 		m_scene = nullptr;
 		return;
 	}
-
-	m_glMeshes.clear();
+		
 	for (unsigned int i = 0; i < m_scene->mNumMeshes; ++i) {
 		aiMesh* mesh = m_scene->mMeshes[i];
 		GLMesh* glMesh = new GLMesh(mesh, m_shader.program());
