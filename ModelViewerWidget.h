@@ -133,4 +133,6 @@ private:
 
     std::vector<std::unique_ptr<GLMesh>> m_glMeshes;
     ShaderProgram m_shader;
+	ShaderProgram m_backgroundShader; // Shader for background gradient
+	ShaderProgram m_overlayShader; // Shader for overlay elements like trihedron
 };

@@ -121,6 +121,9 @@ void ModelViewerWidget::initializeGL() {
 	// Load shader sources (for demo, you can hardcode or load from file)
 	m_shader.load("D:/Sharjith/work/progs/Qt6/AssimpQtViewer/shaders/basic.vert",
 		"D:/Sharjith/work/progs/Qt6/AssimpQtViewer/shaders/basic.frag");
+
+	m_backgroundShader.load("D:/Sharjith/work/progs/Qt6/AssimpQtViewer/shaders/gradientbg.vert",
+		"D:/Sharjith/work/progs/Qt6/AssimpQtViewer/shaders/gradientbg.frag");
 }
 
 void ModelViewerWidget::resizeGL(int w, int h) {
@@ -145,10 +148,14 @@ void ModelViewerWidget::resizeGL(int w, int h) {
 }
 
 void ModelViewerWidget::paintGL() {
+
 	glViewport(0, 0, width(), height());
 	glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+	drawGradientBackground();
+
+	glEnable(GL_DEPTH_TEST);
 	m_viewMatrix = m_camera->getViewMatrix();
 	m_projectionMatrix = m_camera->getProjectionMatrix();
 
@@ -157,9 +164,9 @@ void ModelViewerWidget::paintGL() {
 		m_shader.use();
 
 		QVector3D lightColor(1.0f, 1.0f, 1.0f);
-		QVector3D lightPos(5.0f, 5.0f, 5.0f);
-		QVector3D ambient(0.2f, 0.2f, 0.2f);		
-		float shininess = 128.0f;
+		QVector3D lightPos(0.0f, 0.0f, 1.0f);
+		QVector3D ambient(0.3f, 0.3f, 0.3f);		
+		float shininess = 100.0f;
 
 		QVector3D lightDirWorld(0.577f, 0.577f, 0.577f); // Normalized (1,1,1)		
 		QVector3D cameraTarget = m_viewCenter + lightDirWorld * m_viewRadius; // Target point in world space
@@ -254,33 +261,58 @@ void ModelViewerWidget::computeBoundingBox(const aiScene* scene, const aiNode* n
 }
 
 void ModelViewerWidget::drawGradientBackground() {
-	glPushAttrib(GL_ENABLE_BIT | GL_TRANSFORM_BIT | GL_CURRENT_BIT); // Save state
+
+	glViewport(0, 0, width(), height());
 
 	glDisable(GL_DEPTH_TEST);
-	glDisable(GL_LIGHTING); // Disable lighting if enabled by model draw
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-	glMatrixMode(GL_PROJECTION);
-	glPushMatrix();
-	glLoadIdentity();
-	glOrtho(-1, 1, -1, 1, -1, 1);
+	// Vertex data: positions and colors
+	float vertices[] = {
+		// Position      // Color
+		-1.0f,  1.0f,   0.3f, 0.3f, 0.3f,  // Top left
+		 1.0f,  1.0f,   0.55f, 0.55f, 0.55f, // Top right
+		 1.0f, -1.0f,   0.95f, 0.95f, 0.95f, // Bottom right
+		-1.0f, -1.0f,   0.7f, 0.7f, 0.7f    // Bottom left
+	};
 
-	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
-	glLoadIdentity();
+	unsigned int indices[] = {
+		0, 1, 2,  // First triangle
+		2, 3, 0   // Second triangle
+	};
 
-	glBegin(GL_QUADS);
-	glColor3f(0.3f, 0.3f, 0.3f); glVertex2f(-1.0f, 1.0f);   // Top left
-	glColor3f(0.55f, 0.55f, 0.55f); glVertex2f(1.0f, 1.0f);    // Top right
-	glColor3f(0.95f, 0.95f, 0.95f); glVertex2f(1.0f, -1.0f);   // Bottom right
-	glColor3f(0.7f, 0.7f, 0.7f); glVertex2f(-1.0f, -1.0f);     // Bottom left
-	glEnd();
+	// Generate and bind a VAO and VBO for the vertices
+	unsigned int VAO, VBO, EBO;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glGenBuffers(1, &EBO);
 
-	glPopMatrix(); // MODELVIEW
-	glMatrixMode(GL_PROJECTION);
-	glPopMatrix();
-	glMatrixMode(GL_MODELVIEW);
+	glBindVertexArray(VAO);
 
-	glPopAttrib(); // Restore GL state
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+
+	// Position attribute
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	// Color attribute
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(2 * sizeof(float)));
+	glEnableVertexAttribArray(1);
+
+	// Use your custom shader program
+	m_backgroundShader.use(); // Assumes you have a Shader class that handles compiling/linking shaders
+	glBindVertexArray(VAO);
+	glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+	// Cleanup
+	glBindVertexArray(0);
+	glDeleteBuffers(1, &VBO);
+	glDeleteBuffers(1, &EBO);
+	glDeleteVertexArrays(1, &VAO);
 }
 
 void ModelViewerWidget::drawTrihedron(float axisLength, float axisRadius, float coneHeight, float coneRadius, float sphereRadius) {
