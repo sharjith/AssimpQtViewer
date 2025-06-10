@@ -27,6 +27,10 @@ void ShaderProgram::use() {
     m_program.bind();
 }
 
+void ShaderProgram::release() {
+    m_program.release();
+}
+
 void ShaderProgram::setUniform(const QString& name, const QMatrix4x4& value) {
     m_program.setUniformValue(name.toUtf8().data(), value);
 }

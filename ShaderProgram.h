@@ -10,6 +10,7 @@ public:
 
     bool load(const QString& vertexPath, const QString& fragmentPath);
     void use();
+    void release();
     void setUniform(const QString& name, const QMatrix4x4& value);
     void setUniform(const QString& name, const QVector3D& value);
     void setUniform(const QString& name, const QVector4D& value);

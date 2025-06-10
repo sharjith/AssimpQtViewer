@@ -60,7 +60,11 @@ private:
     void computeBoundingBox(const aiScene* scene, const aiNode* node,
         aiVector3D& minimum, aiVector3D& maximum, const aiMatrix4x4& transform);
     void drawGradientBackground();
-    void drawTrihedron(float axisLength = 1.0f, float axisRadius = 0.05f, float coneHeight = 0.2f, float coneRadius = 0.1f, float sphereRadius = 0.1f);
+    void generateCylinderGeometry();
+    void generateConeGeometry();
+    void drawCylinder(const QMatrix4x4& model);
+    void drawCone(const QMatrix4x4& model);
+    void drawTrihedron(const QMatrix4x4& view, const QMatrix4x4& projection);
     void drawTrihedronOverlay();
     GLuint loadTextureIfNeeded(const aiMaterial* material, unsigned int materialIndex);
 	void updateCamera();
@@ -91,6 +95,9 @@ private:
     const aiScene* m_scene = nullptr;
     aiNode* m_highlightedNode = nullptr;
     Assimp::Importer m_importer;    
+
+    GLuint m_cylinderVAO, m_coneVAO;
+    int m_cylinderVertexCount, m_coneVertexCount;
 
 	GLCamera* m_camera = nullptr; // Custom camera class for handling camera operations
 
@@ -134,5 +141,5 @@ private:
     std::vector<std::unique_ptr<GLMesh>> m_glMeshes;
     ShaderProgram m_shader;
 	ShaderProgram m_backgroundShader; // Shader for background gradient
-	ShaderProgram m_overlayShader; // Shader for overlay elements like trihedron
+	ShaderProgram m_trihedronShader; // Shader for overlay elements like trihedron
 };

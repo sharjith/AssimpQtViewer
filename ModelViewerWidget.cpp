@@ -124,6 +124,12 @@ void ModelViewerWidget::initializeGL() {
 
 	m_backgroundShader.load(":/shaders/shaders/gradientbg.vert",
 		":/shaders/shaders/gradientbg.frag");
+
+	m_trihedronShader.load(":/shaders/shaders/trihedron.vert",
+		":/shaders/shaders/trihedron.frag");
+
+	generateCylinderGeometry();
+	generateConeGeometry();
 }
 
 void ModelViewerWidget::resizeGL(int w, int h) {
@@ -193,6 +199,8 @@ void ModelViewerWidget::paintGL() {
 			mesh->draw();
 		}
 	}
+
+	drawTrihedronOverlay(); // Draw trihedron in mini viewport
 
 }
 
@@ -315,100 +323,190 @@ void ModelViewerWidget::drawGradientBackground() {
 	glDeleteVertexArrays(1, &VAO);
 }
 
-void ModelViewerWidget::drawTrihedron(float axisLength, float axisRadius, float coneHeight, float coneRadius, float sphereRadius) {
-	GLUquadric* quad = gluNewQuadric();
+void ModelViewerWidget::generateCylinderGeometry() {
+	std::vector<float> vertices;
+	const int segments = 12;
+	const float radius = 0.05f;
+	const float height = 1.0f;
 
-	glPushAttrib(GL_ENABLE_BIT | GL_CURRENT_BIT | GL_LIGHTING_BIT | GL_TRANSFORM_BIT);
-	glPushMatrix();
+	for (int i = 0; i <= segments; ++i) {
+		float angle = 2.0f * M_PI * i / segments;
+		float x = radius * cos(angle);
+		float y = radius * sin(angle);
 
-	glDisable(GL_LIGHTING);
+		// Bottom circle
+		vertices.push_back(x);
+		vertices.push_back(y);
+		vertices.push_back(0.0f);
 
-	// Draw center sphere
-	glColor3f(0.8f, 0.8f, 0.0f);
-	gluSphere(quad, sphereRadius, 16, 16);
+		// Top circle
+		vertices.push_back(x);
+		vertices.push_back(y);
+		vertices.push_back(height);
+	}
+	m_cylinderVertexCount = vertices.size() / 3;
 
-	// ===== X Axis (Red) =====
-	glColor3f(1.0f, 0.0f, 0.0f);  // Red
-	glPushMatrix();
-	glRotatef(90, 0, 1, 0); // Point along +X
-	gluCylinder(quad, axisRadius, axisRadius, axisLength, 12, 1);
-	glTranslatef(0, 0, axisLength);
-	gluCylinder(quad, coneRadius, 0.0, coneHeight, 12, 1); // Cone tip
-	glPopMatrix();
+	// Generate VAO/VBO
+	GLuint VBO;
+	glGenVertexArrays(1, &m_cylinderVAO);
+	glGenBuffers(1, &VBO);
 
-	// ===== Y Axis (Green) =====
-	glColor3f(0.0f, 1.0f, 0.0f);  // Green
-	glPushMatrix();
-	glRotatef(-90, 1, 0, 0); // Point along +Y
-	gluCylinder(quad, axisRadius, axisRadius, axisLength, 12, 1);
-	glTranslatef(0, 0, axisLength);
-	gluCylinder(quad, coneRadius, 0.0, coneHeight, 12, 1); // Cone tip
-	glPopMatrix();
+	glBindVertexArray(m_cylinderVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
 
-	// ===== Z Axis (Blue) =====
-	glColor3f(0.0f, 0.0f, 1.0f);  // Blue
-	glPushMatrix();
-	// Already aligned with +Z
-	gluCylinder(quad, axisRadius, axisRadius, axisLength, 12, 1);
-	glTranslatef(0, 0, axisLength);
-	gluCylinder(quad, coneRadius, 0.0, coneHeight, 12, 1); // Cone tip
-	glPopMatrix();
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
 
-	gluDeleteQuadric(quad);
+	glBindVertexArray(0);
+}
 
-	glPopMatrix();
-	glPopAttrib();
+void ModelViewerWidget::generateConeGeometry() {
+	std::vector<float> vertices;
+	const int segments = 12;
+	const float radius = 0.1f;
+	const float height = 0.2f;
+
+	// Cone base
+	vertices.push_back(0.0f); // Center of base
+	vertices.push_back(0.0f);
+	vertices.push_back(0.0f);
+
+	for (int i = 0; i <= segments; ++i) {
+		float angle = 2.0f * M_PI * i / segments;
+		float x = radius * cos(angle);
+		float y = radius * sin(angle);
+		vertices.push_back(x);
+		vertices.push_back(y);
+		vertices.push_back(0.0f);
+	}
+
+	// Cone tip
+	vertices.push_back(0.0f); // Tip of cone
+	vertices.push_back(0.0f);
+	vertices.push_back(height);
+
+	m_coneVertexCount = vertices.size() / 3;
+
+	// Generate VAO/VBO
+	GLuint VBO;
+	glGenVertexArrays(1, &m_coneVAO);
+	glGenBuffers(1, &VBO);
+
+	glBindVertexArray(m_coneVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	glBindVertexArray(0);
+}
+
+void ModelViewerWidget::drawCylinder(const QMatrix4x4& model) {
+	m_trihedronShader.use();
+	m_trihedronShader.setUniform("uModel", model);
+
+	glBindVertexArray(m_cylinderVAO);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, m_cylinderVertexCount);
+	glBindVertexArray(0);
+	m_trihedronShader.release();
+}
+
+void ModelViewerWidget::drawCone(const QMatrix4x4& model) {
+	m_trihedronShader.use();
+	m_trihedronShader.setUniform("uModel", model);
+
+	glBindVertexArray(m_coneVAO);
+	glDrawArrays(GL_TRIANGLE_FAN, 0, m_coneVertexCount);
+	glBindVertexArray(0);
+
+	m_trihedronShader.release();
+}
+
+void ModelViewerWidget::drawTrihedron(const QMatrix4x4& view, const QMatrix4x4& projection) {
+	m_trihedronShader.use();
+
+	// Set view and projection matrices
+	m_trihedronShader.setUniform("uView", view);
+	m_trihedronShader.setUniform("uProjection", projection);
+
+	QMatrix4x4 model;
+
+	// Draw X-axis (Red)
+	model.setToIdentity();
+	model.rotate(90, 0, 1, 0); // Rotate to align with X-axis
+	m_trihedronShader.setUniform("uColor", QVector3D(1.0f, 0.0f, 0.0f)); // Red
+	drawCylinder(model);
+
+	model.setToIdentity(); // Reset model matrix
+	model.translate(1.0f, 0.0f, 0.0f); // Move to cylinder tip
+	model.rotate(90, 0, 1, 0); // Align cone along +X-axis
+	drawCone(model);
+
+	// Draw Y-axis (Green)
+	model.setToIdentity();
+	model.rotate(-90, 1, 0, 0); // Rotate to align with Y-axis
+	m_trihedronShader.setUniform("uColor", QVector3D(0.0f, 1.0f, 0.0f)); // Green
+	drawCylinder(model);
+
+	model.setToIdentity(); // Reset model matrix
+	model.translate(0.0f, 1.0f, 0.0f); // Move to cylinder tip
+	model.rotate(-90, 1, 0, 0); // Rotate cylinder along +Y-axis
+	drawCone(model);
+
+	// Draw Z-axis (Blue)
+	model.setToIdentity();
+	m_trihedronShader.setUniform("uColor", QVector3D(0.0f, 0.0f, 1.0f)); // Blue
+	drawCylinder(model);
+
+	model.translate(0.0f, 0.0f, 1.0f); // Move to cylinder tip
+	drawCone(model);
+
+	m_trihedronShader.release();
 }
 
 
 void ModelViewerWidget::drawTrihedronOverlay() {
-	int size = 100; // Size of mini viewport
-	int margin = 10;
+	const int overlaySize = 100; // Size of mini viewport
+	const int margin = 10;      // Margin from the bottom-left corner
 
-	glPushAttrib(GL_VIEWPORT_BIT | GL_ENABLE_BIT | GL_CURRENT_BIT | GL_DEPTH_BUFFER_BIT);
-	glViewport(margin, margin, size, size);
+	// Set up the mini viewport
+	glViewport(margin, margin, overlaySize, overlaySize);
+	glClear(GL_DEPTH_BUFFER_BIT); // Clear depth buffer for the overlay
 
-	glMatrixMode(GL_PROJECTION);
-	glPushMatrix();
-	glLoadIdentity();
-
-
+	// Create projection matrix
+	QMatrix4x4 projection;
 	if (m_camera->getProjectionType() == GLCamera::ProjectionType::PERSPECTIVE) {
-		// Narrow FOV for better appearance in small viewport
-		gluPerspective(30.0, 1.0, 0.1, 10.0);
-		glScalef(1.0f, 1.0f, 1.0f); // Scale to normal size
+		// Narrow field of view for better appearance in small viewport
+		projection.perspective(30.0, 1.0, 0.1, 10.0);
 	}
 	else {
 		// Orthographic projection for overlay
 		float orthoSize = 1.5f;
-		glOrtho(-orthoSize, orthoSize, -orthoSize, orthoSize, 0.1, 10.0);
-		glScalef(1.25f, 1.25f, 1.25f); // Scale to fit viewport
+		projection.ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, 0.1f, 10.0f);
 	}
 
-	glMatrixMode(GL_MODELVIEW);
-	glPushMatrix();
-	glLoadIdentity();
-	gluLookAt(0.0, 0.0, 5.0,  // Eye position
-		0.0, 0.0, 0.0,  // Look at origin
-		0.0, 1.0, 0.0); // Up vector
+	// Create view matrix for overlay
+	QMatrix4x4 view;
+	view.lookAt(QVector3D(0.0, 0.0, 5.0), // Eye position
+		QVector3D(0.0, 0.0, 0.0), // Target position (origin)
+		QVector3D(0.0, 1.0, 0.0)); // Up vector
 
 	// Extract the camera's rotation matrix
-	QMatrix4x4 view = m_camera->getViewMatrix();
+	QMatrix4x4 cameraView = m_camera->getViewMatrix();
 
-	// Remove translation component
-	view.setColumn(3, QVector4D(0, 0, 0, 1));
+	// Remove the translation component
+	cameraView.setColumn(3, QVector4D(0, 0, 0, 1)); // Zero out the translation part
 
-	// Apply only rotation part of the main camera
-	glMultMatrixf(view.constData());
+	// Combine the overlay view matrix with the main camera's rotation matrix
+	view = view * cameraView;
 
-	drawTrihedron();
+	// Draw the trihedron (axes)
+	drawTrihedron(view, projection);
 
-	// Restore OpenGL state
-	glPopMatrix(); // ModelView
-	glMatrixMode(GL_PROJECTION);
-	glPopMatrix();
-	glMatrixMode(GL_MODELVIEW);
-	glPopAttrib();
+	// Restore the viewport to the main scene
+	glViewport(0, 0, width(), height());
 }
 
 void ModelViewerWidget::loadModel(const QString& filePath) {
