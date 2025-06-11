@@ -10,6 +10,7 @@
 #include <QToolButton>
 #include <QMatrix4x4>
 #include "GLMesh.h"
+#include "Trihedron.h"
 #include "ShaderProgram.h"
 
 class GLCamera;
@@ -59,14 +60,7 @@ private slots:
 private:   
     void computeBoundingBox(const aiScene* scene, const aiNode* node,
         aiVector3D& minimum, aiVector3D& maximum, const aiMatrix4x4& transform);
-    void drawGradientBackground();
-    void generateCylinderGeometry();
-    void generateConeGeometry();
-    void generateSphereGeometry();
-    void drawCylinder(const QMatrix4x4& model);
-    void drawCone(const QMatrix4x4& model);
-    void drawSphere(const QMatrix4x4& model);
-    void drawTrihedron(const QMatrix4x4& view, const QMatrix4x4& projection);
+    void drawGradientBackground();   
     void drawTrihedronOverlay();
     GLuint loadTextureIfNeeded(const aiMaterial* material, unsigned int materialIndex);
 	void updateCamera();
@@ -97,12 +91,6 @@ private:
     const aiScene* m_scene = nullptr;
     aiNode* m_highlightedNode = nullptr;
     Assimp::Importer m_importer;    
-
-    GLuint m_cylinderVAO, m_coneVAO;
-    GLuint m_sphereVAO;
-    GLuint m_sphereVBO;
-    GLuint m_sphereEBO;
-    int m_cylinderVertexCount, m_coneVertexCount, m_sphereIndexCount;
 
 	GLCamera* m_camera = nullptr; // Custom camera class for handling camera operations
 
@@ -146,5 +134,8 @@ private:
     std::vector<std::unique_ptr<GLMesh>> m_glMeshes;
     ShaderProgram m_shader;
 	ShaderProgram m_backgroundShader; // Shader for background gradient
-	ShaderProgram m_trihedronShader; // Shader for overlay elements like trihedron
+	
+    std::unique_ptr<Trihedron> m_trihedron; // Trihedron for orientation reference    
+    ShaderProgram m_trihedronShader; // Shader for overlay elements like trihedron
+
 };

@@ -28,6 +28,7 @@ set(SOURCES
     GLCamera.cpp
     GLMesh.cpp
     ShaderProgram.cpp
+    Trihedron.cpp
     Resource.qrc
 )
 
@@ -38,6 +39,7 @@ set(HEADERS
     GLCamera.h
     GLMesh.h
     ShaderProgram.h
+    Trihedron.h
     AssimpProgressHandler.h
 )
 
