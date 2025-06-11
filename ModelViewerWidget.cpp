@@ -817,27 +817,40 @@ void ModelViewerWidget::onInertiaTimeout()
 void ModelViewerWidget::pickAtScreenPosition(const QPoint& pos) {
 	makeCurrent(); // Needed if using Qt with OpenGL
 
-	GLint viewport[4];
-	GLdouble modelview[16], projection[16];
-	glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
-	glGetDoublev(GL_PROJECTION_MATRIX, projection);
-	glGetIntegerv(GL_VIEWPORT, viewport);
+	// Get the viewport dimensions
+	QRect viewportRect(0, 0, width(), height());
 
 	float x = pos.x();
-	float y = viewport[3] - pos.y(); // Flip Y for OpenGL
+	float y = viewportRect.height() - pos.y(); // Flip Y for OpenGL
+	float normalizedX = (x / viewportRect.width()) * 2.0f - 1.0f; // Normalize to [-1, 1]
+	float normalizedY = (y / viewportRect.height()) * 2.0f - 1.0f;
 
-	// Near and far points
-	double nearX, nearY, nearZ;
-	double farX, farY, farZ;
+	// Create normalized device coordinates (NDC) for near and far points
+	QVector4D nearPointNDC(normalizedX, normalizedY, -1.0f, 1.0f); // NDC z = -1 for near
+	QVector4D farPointNDC(normalizedX, normalizedY, 1.0f, 1.0f);   // NDC z = 1 for far
 
-	gluUnProject(x, y, 0.0, modelview, projection, viewport, &nearX, &nearY, &nearZ);
-	gluUnProject(x, y, 1.0, modelview, projection, viewport, &farX, &farY, &farZ);
+	// Compute the inverse of the transformation matrix
+	QMatrix4x4 viewProjectionMatrix = m_projectionMatrix * m_viewMatrix;
+	QMatrix4x4 inverseViewProjectionMatrix = viewProjectionMatrix.inverted();
 
-	aiVector3D rayOrigin((float)nearX, (float)nearY, (float)nearZ);
-	aiVector3D rayDirection((float)(farX - nearX), (float)(farY - nearY), (float)(farZ - nearZ));
-	rayDirection.Normalize();
+	// Unproject the NDC points to world space
+	QVector4D nearPointWorld = inverseViewProjectionMatrix * nearPointNDC;
+	QVector4D farPointWorld = inverseViewProjectionMatrix * farPointNDC;
 
-	pickRay(rayOrigin, rayDirection);
+	// Perform perspective divide to convert from homogeneous coordinates
+	nearPointWorld /= nearPointWorld.w();
+	farPointWorld /= farPointWorld.w();
+
+	// Extract ray origin and direction
+	QVector3D rayOrigin = nearPointWorld.toVector3D();
+	QVector3D rayDirection = (farPointWorld.toVector3D() - rayOrigin).normalized();
+
+	// Convert to aiVector3D if needed
+	aiVector3D aiRayOrigin(rayOrigin.x(), rayOrigin.y(), rayOrigin.z());
+	aiVector3D aiRayDirection(rayDirection.x(), rayDirection.y(), rayDirection.z());
+
+	// Handle the pick ray
+	pickRay(aiRayOrigin, aiRayDirection);
 }
 
 void ModelViewerWidget::pickRay(const aiVector3D& origin, const aiVector3D& dir) {
