@@ -9,9 +9,12 @@ uniform float shininess;
 uniform vec3 viewPos;
 uniform vec3 lightDir;
 
+uniform bool isSelected = false; // Selection state
+
 out vec4 fragColor;
 
 void main() {
+
     vec3 norm = normalize(gl_FrontFacing ? fragNormal : -fragNormal);
     vec3 L = normalize(lightDir);
     vec3 V = normalize(viewPos - fragPos);
@@ -25,9 +28,9 @@ void main() {
     vec3 fillLight2 = normalize(vec3(-0.3, 0.2, 0.8));  // Back-side fill
     vec3 fillLight3 = normalize(vec3(0.2, -0.5, -0.4)); // Bottom fill
     
-    float fill1 = max(dot(norm, fillLight1), 0.0) * 0.10;
-    float fill2 = max(dot(norm, fillLight2), 0.0) * 0.08;
-    float fill3 = max(dot(norm, fillLight3), 0.0) * 0.06;
+    float fill1 = max(dot(norm, fillLight1), 0.0) * 0.010;
+    float fill2 = max(dot(norm, fillLight2), 0.0) * 0.008;
+    float fill3 = max(dot(norm, fillLight3), 0.0) * 0.006;
     
     vec3 fillLighting = (fill1 + fill2 + fill3) * vColor.rgb;
     
@@ -79,5 +82,36 @@ void main() {
     // Simple edge contrast without color distortion
     result = result * (1.0 + fresnel * 0.06);
     
-    fragColor = vec4(clamp(result, 0.0, 1.0), vColor.a);
+    fragColor = vec4(clamp(result, 0.0, 1.0), vColor.a); 
+
+      // --- Selection Highlight ---
+    if (isSelected) {
+        // Compute lighting
+        vec3 norm = normalize(gl_FrontFacing ? fragNormal : -fragNormal);
+        //vec3 lightDir = normalize(viewPos - fragPos);
+        float diff = max(dot(norm, lightDir), 0.0);
+
+        vec3 viewDir = normalize(viewPos - fragPos);
+        vec3 reflectDir = reflect(-lightDir, norm);
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
+
+        // Base color from fragColor
+        vec3 baseColor = fragColor.rgb;
+
+        // Lighten the color with lighting + subtle spec
+        vec3 lightened = baseColor + vec3(0.3) * diff + vec3(0.2) * spec + vec3(0.1);
+        lightened = clamp(lightened, 0.0, 1.0);
+
+        // Apply a subtle transparency
+        float alpha = fragColor.a * 0.99;
+
+        // Add glow effect
+        vec3 glowColor = lightened * 1.2; // Make the glow a bit brighter
+        glowColor = clamp(glowColor, 0.0, 1.0);
+
+        // Mix base color with the glow
+        vec3 finalColor = mix(lightened, glowColor, 0.5); // blend base and glow color
+
+        fragColor = vec4(finalColor, alpha);    
+    }
 }

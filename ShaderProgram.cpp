@@ -51,6 +51,11 @@ void ShaderProgram::setUniform(const QString& name, int value) {
     m_program.setUniformValue(name.toUtf8().data(), value);
 }
 
+void ShaderProgram::setUniform(const QString& name, bool value) {
+    m_program.setUniformValue(name.toUtf8().data(), value);
+}
+
+
 QOpenGLShaderProgram* ShaderProgram::program() {
     return &m_program;
 }

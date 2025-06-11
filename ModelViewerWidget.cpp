@@ -180,21 +180,25 @@ void ModelViewerWidget::paintGL() {
 		QVector3D viewDir = cameraTarget - cameraPos;
 		viewDir.normalize();
 		m_shader.setUniform("lightDir", lightDirWorld);
-		m_shader.setUniform("viewPos", cameraPos);
-		m_shader.setUniform("lightColor", lightColor);
+		m_shader.setUniform("viewPos", cameraPos);		
 		m_shader.setUniform("lightPos", lightPos);
-		m_shader.setUniform("ambientColor", ambient);
-				
+		m_shader.setUniform("ambientColor", ambient);				
 		m_shader.setUniform("shininess", shininess);
 
 		m_shader.setUniform("mvp", m_projectionMatrix * m_viewMatrix);
 		m_shader.setUniform("view", m_viewMatrix);
 
 		for (const auto& mesh : m_glMeshes) {
-			QVector4D diffuse(0.8f, 0.8f, 0.8f, 1.0f);
-			m_shader.setUniform("color", diffuse);
-			m_shader.setUniform("specularColor", mesh->m_material.specular);			
+			m_shader.setUniform("specularColor", mesh->material().specular);
 			m_shader.setUniform("model", mesh->modelMatrix());
+			if(m_highlightedNode && mesh->mesh()->mName == m_highlightedNode->mName) {
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+				m_shader.setUniform("isSelected", true); // Highlight color
+			} else {
+				glDisable(GL_BLEND);
+				m_shader.setUniform("isSelected", false); // Default color
+			}
 			mesh->draw();
 		}
 	}

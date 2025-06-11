@@ -16,6 +16,7 @@ public:
     void setUniform(const QString& name, const QVector4D& value);
     void setUniform(const QString& name, float value);
     void setUniform(const QString& name, int value);
+    void setUniform(const QString& name, bool value);
     QOpenGLShaderProgram* program();
 
 private:

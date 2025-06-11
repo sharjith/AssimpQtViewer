@@ -38,7 +38,18 @@ public:
     void setModelMatrix(const QMatrix4x4& mat);
     const QMatrix4x4& modelMatrix() const;
 
-    Material m_material;
+	void setMaterial(Material&& material) { m_material = std::move(material); }
+	const Material& material() const { return m_material; }
+
+    void setSelected(bool selected) { m_isSelected = selected; }
+    bool isSelected() const { return m_isSelected; }
+    // Getters for mesh properties
+    const aiMesh* mesh() const { return m_mesh; }
+    int indexCount() const { return m_indexCount; }
+    // Getters for VBO and EBO
+    QOpenGLBuffer& vbo() { return m_vbo; }
+	QOpenGLBuffer& ebo() { return m_ebo; }
+
 private:
 
 	aiMesh* m_mesh = nullptr;
@@ -46,7 +57,9 @@ private:
     QOpenGLBuffer m_vbo{ QOpenGLBuffer::VertexBuffer };
     QOpenGLBuffer m_ebo{ QOpenGLBuffer::IndexBuffer };
     int m_indexCount = 0;
-    
+	bool m_isSelected = false;  
+    Material m_material;
+
     QMatrix4x4 m_modelMatrix;
     QOpenGLShaderProgram* m_program;
 };
