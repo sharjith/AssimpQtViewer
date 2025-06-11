@@ -88,8 +88,11 @@ MainWindow::MainWindow(QWidget* parent)
 	connect(aboutQtAct, &QAction::triggered, this, &QApplication::aboutQt);
 
 	connect(m_searchBox, &QLineEdit::textChanged, this, &MainWindow::filterTree);
+	
 	connect(m_viewerWidget, &ModelViewerWidget::nodePicked,
 		this, &MainWindow::selectTreeNodeFor);
+	connect(m_viewerWidget, &ModelViewerWidget::meshPicked,
+		this, &MainWindow::selectTreeMeshFor);
 
 	setAcceptDrops(true);
 
@@ -139,27 +142,82 @@ void MainWindow::setProgressValue(const int& value)
 	qApp->processEvents();
 }
 
-
-
 void MainWindow::populateTree(const aiScene* scene) {
 	if (!scene || !scene->mRootNode) return;
+
 	std::function<void(aiNode*, QTreeWidgetItem*)> recurse =
 		[&](aiNode* node, QTreeWidgetItem* parentItem) {
-		QTreeWidgetItem* item = new QTreeWidgetItem();
-		item->setText(0, QString::fromUtf8(node->mName.C_Str()));
-		item->setData(0, Qt::UserRole, QVariant::fromValue<void*>(node));
-		m_nodeToItem[node] = item;
-		if (parentItem) parentItem->addChild(item);
-		else m_treeWidget->addTopLevelItem(item);
-		for (unsigned i = 0; i < node->mNumChildren; ++i)
-			recurse(node->mChildren[i], item);
+
+		// Create the node item
+		QTreeWidgetItem* nodeItem = new QTreeWidgetItem();
+		nodeItem->setText(0, QString::fromUtf8(node->mName.C_Str()));
+		nodeItem->setData(0, Qt::UserRole, QVariant::fromValue<void*>(node));
+		m_nodeToItem[node] = nodeItem;
+
+		if (parentItem) {
+			parentItem->addChild(nodeItem);
+		}
+		else {
+			m_treeWidget->addTopLevelItem(nodeItem);
+		}
+
+		// Handle meshes based on count
+		if (node->mNumMeshes > 1) {
+			// Multiple meshes: add each as a child
+			for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
+				unsigned int meshIndex = node->mMeshes[i];
+				aiMesh* mesh = scene->mMeshes[meshIndex];
+
+				QTreeWidgetItem* meshItem = new QTreeWidgetItem();
+
+				// Use mesh name if available, otherwise use a generic name
+				QString meshName = QString::fromUtf8(mesh->mName.C_Str());
+				if (meshName.isEmpty()) {
+					meshName = QString("Mesh_%1").arg(meshIndex);
+				}
+
+				meshItem->setText(0, meshName);
+				meshItem->setData(0, Qt::UserRole, QVariant::fromValue<void*>(node)); // Store parent node
+				meshItem->setData(0, Qt::UserRole + 1, meshIndex); // Store mesh index
+
+				nodeItem->addChild(meshItem);
+			}
+		}
+		else if (node->mNumMeshes == 1) {
+			// Single mesh: store mesh info in the node item itself
+			unsigned int meshIndex = node->mMeshes[0];
+			nodeItem->setData(0, Qt::UserRole + 1, meshIndex); // Store mesh index
+		}
+		// If mNumMeshes == 0, just keep it as a container node (no additional data)
+
+		// Recursively process child nodes
+		for (unsigned i = 0; i < node->mNumChildren; ++i) {
+			recurse(node->mChildren[i], nodeItem);
+		}
 		};
+
 	recurse(scene->mRootNode, nullptr);
 }
 
 void MainWindow::onTreeItemClicked(QTreeWidgetItem* item, int column) {
 	aiNode* node = static_cast<aiNode*>(item->data(0, Qt::UserRole).value<void*>());
-	m_viewerWidget->highlightNode(node);
+	QVariant meshIndexData = item->data(0, Qt::UserRole + 1);
+
+	if (meshIndexData.isValid()) {
+		// This item represents a specific mesh
+		unsigned int meshIndex = meshIndexData.toUInt();
+		m_viewerWidget->highlightMesh(meshIndex);
+
+	}
+	else if (node) {
+		// This is a node item (container or single mesh node)
+		m_viewerWidget->highlightNode(node);
+
+	}
+	else {
+		// Clear selection
+		m_viewerWidget->clearHighlight();
+	}
 }
 
 
@@ -219,6 +277,32 @@ void MainWindow::selectTreeNodeFor(aiNode* node) {
 		m_treeWidget->scrollToItem(item);
 		item->setSelected(true);
 		m_currentlySelectedNode = node;
+	}
+}
+
+void MainWindow::selectTreeMeshFor(int meshIndex) {
+	// If meshIndex is -1, deselect
+	if (meshIndex == -1) {
+		m_treeWidget->setCurrentItem(nullptr);
+		m_currentlySelectedNode = nullptr;
+		return;
+	}
+
+	// Find which node contains this mesh
+	aiNode* nodeContainingMesh = m_viewerWidget->findNodeForMesh(m_viewerWidget->getScene()->mRootNode, meshIndex);
+	if (!nodeContainingMesh) return;
+
+	// Find the tree item for this node
+	auto it = m_nodeToItem.find(nodeContainingMesh);
+	if (it != m_nodeToItem.end()) {
+		QTreeWidgetItem* item = it->second;
+		m_treeWidget->setCurrentItem(item);
+		m_treeWidget->scrollToItem(item);
+		item->setSelected(true);
+		m_currentlySelectedNode = nodeContainingMesh;
+
+		// Optionally, you could also highlight which specific mesh within the node
+		// if your tree structure shows individual meshes as child items
 	}
 }
 

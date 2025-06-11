@@ -188,16 +188,36 @@ void ModelViewerWidget::paintGL() {
 		m_shader.setUniform("mvp", m_projectionMatrix * m_viewMatrix);
 		m_shader.setUniform("view", m_viewMatrix);
 
-		for (const auto& mesh : m_glMeshes) {
+		for (const auto& meshptr : m_glMeshes) {
+			GLMesh* mesh = meshptr.get(); // Use smart pointer to access raw pointer
+			bool shouldHighlight = false;
 			m_shader.setUniform("specularColor", mesh->material().specular);
 			m_shader.setUniform("model", mesh->modelMatrix());
-			if(m_highlightedNode && mesh->mesh()->mName == m_highlightedNode->mName) {
+			
+			// Check if this mesh should be highlighted
+			if (m_highlightedMeshIndex >= 0) {
+				// Direct lookup
+				auto it = m_meshIndexToGLMesh.find(m_highlightedMeshIndex);
+				shouldHighlight = (it != m_meshIndexToGLMesh.end() && it->second == mesh);
+			}
+			else if (m_highlightedNode) {
+				// Highlighting node - check if this mesh belongs to the highlighted node
+				auto it = m_nodeMeshes.find(m_highlightedNode);
+				if (it != m_nodeMeshes.end()) {
+					const auto& nodeMeshes = it->second;
+					shouldHighlight = std::find(nodeMeshes.begin(), nodeMeshes.end(), mesh) != nodeMeshes.end();
+				}
+			}
+
+			// Apply highlighting
+			if (shouldHighlight) {
 				glEnable(GL_BLEND);
 				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-				m_shader.setUniform("isSelected", true); // Highlight color
-			} else {
+				m_shader.setUniform("isSelected", true);
+			}
+			else {
 				glDisable(GL_BLEND);
-				m_shader.setUniform("isSelected", false); // Default color
+				m_shader.setUniform("isSelected", false);
 			}
 			mesh->draw();
 		}
@@ -393,16 +413,34 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 		m_scene = nullptr;
 		return;
 	}
-		
-	for (unsigned int i = 0; i < m_scene->mNumMeshes; ++i) {
-		aiMesh* mesh = m_scene->mMeshes[i];
-		GLMesh* glMesh = new GLMesh(mesh, m_shader.program());
 
-		// Set up material
+	if (m_scene->mRootNode) {
+		loadNodeMeshes(m_scene->mRootNode);
+	}
+		
+			
+	updateCamera();
+	update();
+}
+
+void ModelViewerWidget::loadNodeMeshes(aiNode* node) {
+
+	/*qDebug() << "Processing node:" << node->mName.C_Str()
+		<< "Meshes:" << node->mNumMeshes
+		<< "Children:" << node->mNumChildren;*/
+
+	// Load meshes for this node
+	for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
+		unsigned int meshIndex = node->mMeshes[i];
+		aiMesh* mesh = m_scene->mMeshes[meshIndex];
+
+		//GLMesh* glMesh = new GLMesh(mesh, m_shader.program());
+		auto glMesh = std::make_unique<GLMesh>(mesh, m_shader.program());
+
+		// Set up material (your existing code)
 		Material mat;
 		if (mesh->mMaterialIndex >= 0) {
 			aiMaterial* material = m_scene->mMaterials[mesh->mMaterialIndex];
-
 			aiColor4D c;
 			if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_AMBIENT, c))
 				mat.ambient = QVector4D(c.r, c.g, c.b, c.a);
@@ -415,14 +453,21 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 				mat.shininess = shininess;
 		}
 
-		glMesh->setMaterial(mat); // Store material in mesh
-		glMesh->setupMesh(); // Initialize OpenGL buffers
+		glMesh->setMaterial(mat);
+		glMesh->setupMesh();
 
-		m_glMeshes.emplace_back(glMesh);
+		// Store associations - use raw pointer
+		GLMesh* rawPtr = glMesh.get();
+		m_nodeMeshes[node].push_back(rawPtr);
+		m_meshIndexToGLMesh[meshIndex] = rawPtr; // Store raw pointer
+
+		m_glMeshes.emplace_back(std::move(glMesh));
 	}
-		
-	updateCamera();
-	update();
+
+	// Recursively process child nodes
+	for (unsigned int i = 0; i < node->mNumChildren; ++i) {
+		loadNodeMeshes(node->mChildren[i]);
+	}
 }
 
 
@@ -459,6 +504,19 @@ GLuint ModelViewerWidget::loadTextureIfNeeded(const aiMaterial* material, unsign
 
 void ModelViewerWidget::highlightNode(aiNode* node) {
 	m_highlightedNode = node;
+	m_highlightedMeshIndex = -1; // Clear mesh selection
+	update();
+}
+
+void ModelViewerWidget::highlightMesh(int meshIndex) {
+	m_highlightedMeshIndex = meshIndex;
+	m_highlightedNode = nullptr; // Clear node selection
+	update();
+}
+
+void ModelViewerWidget::clearHighlight() {
+	m_highlightedNode = nullptr;
+	m_highlightedMeshIndex = -1;
 	update();
 }
 
@@ -866,23 +924,18 @@ void ModelViewerWidget::pickRay(const aiVector3D& origin, const aiVector3D& dir)
 	std::function<void(aiNode*, const aiMatrix4x4&)> traverse;
 	traverse = [&](aiNode* node, const aiMatrix4x4& parentTransform) {
 		aiMatrix4x4 transform = parentTransform * node->mTransformation;
-
 		for (unsigned i = 0; i < node->mNumMeshes; ++i) {
 			const int meshIndex = node->mMeshes[i];
 			const aiMesh* mesh = m_scene->mMeshes[meshIndex];
-
 			for (unsigned f = 0; f < mesh->mNumFaces; ++f) {
 				const aiFace& face = mesh->mFaces[f];
 				if (face.mNumIndices != 3) continue;
-
 				aiVector3D v0 = mesh->mVertices[face.mIndices[0]];
 				aiVector3D v1 = mesh->mVertices[face.mIndices[1]];
 				aiVector3D v2 = mesh->mVertices[face.mIndices[2]];
-
 				v0 *= transform;
 				v1 *= transform;
 				v2 *= transform;
-
 				float t;
 				if (rayIntersectsTriangle(origin, dir, v0, v1, v2, t)) {
 					if (t < minDistance) {
@@ -893,7 +946,6 @@ void ModelViewerWidget::pickRay(const aiVector3D& origin, const aiVector3D& dir)
 				}
 			}
 		}
-
 		for (unsigned i = 0; i < node->mNumChildren; ++i)
 			traverse(node->mChildren[i], transform);
 		};
@@ -901,19 +953,22 @@ void ModelViewerWidget::pickRay(const aiVector3D& origin, const aiVector3D& dir)
 	traverse(m_scene->mRootNode, aiMatrix4x4());
 
 	if (hitMeshIndex != -1) {
-		aiNode* hitNode = findNodeForMesh(m_scene->mRootNode, hitMeshIndex);
-		if (m_lastPickedNode == hitNode) {
-			emit nodePicked(nullptr); // Signal to deselect
-			m_lastPickedNode = nullptr;
+		// Check if we're clicking the same mesh again
+		if (m_lastPickedMeshIndex == hitMeshIndex) {
+			emit meshPicked(-1); // Signal to deselect  
+			m_lastPickedMeshIndex = -1;
+			highlightMesh(-1); // Clear highlight
 		}
 		else {
-			emit nodePicked(hitNode);
-			m_lastPickedNode = hitNode;
+			emit meshPicked(hitMeshIndex);
+			m_lastPickedMeshIndex = hitMeshIndex;
+			highlightMesh(hitMeshIndex); // Highlight specific mesh
 		}
-		highlightNode(m_lastPickedNode);
 	}
 	else {
-		highlightNode(nullptr);
+		// No mesh hit, clear selection
+		m_lastPickedMeshIndex = -1;
+		highlightMesh(-1);
 	}
 }
 

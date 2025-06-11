@@ -18,7 +18,8 @@ private slots:
     void filterTree(const QString& text);
     void showFileReadingProgress(float percent);
 private:
-    void selectTreeNodeFor(aiNode* node); // ← this will highlight the item
+    void selectTreeNodeFor(aiNode* node); // ← this will highlight the node
+    void selectTreeMeshFor(int meshIndex);// ← this will highlight the mesh
     void loadModel(const QString& path);    
     void setProgressValue(const int& value);
     void populateTree(const aiScene* scene);

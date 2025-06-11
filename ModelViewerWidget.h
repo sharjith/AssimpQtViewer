@@ -33,7 +33,13 @@ public:
     void loadModel(const QString &filePath);    
     const aiScene* getScene() const { return m_scene; }
     void highlightNode(aiNode *node);
+    void highlightMesh(int meshIndex);
+    void clearHighlight();
+
 	Assimp::Importer* getImporter() { return &m_importer; }
+
+    aiNode* findNodeForMesh(aiNode* node, int meshIndex);
+
 protected:
     void initializeGL() override;
     void resizeGL(int w, int h) override;
@@ -49,15 +55,17 @@ protected:
 	void focusOutEvent(QFocusEvent* event) override;*/
 
     void resizeEvent(QResizeEvent* event) override;
-
+       
 
 signals:
     void nodePicked(aiNode* node);
+    void meshPicked(int meshIndex);
 
 private slots:
     void onInertiaTimeout();
 
 private:   
+    void loadNodeMeshes(aiNode* node);
     void computeBoundingBox(const aiScene* scene, const aiNode* node,
         aiVector3D& minimum, aiVector3D& maximum, const aiMatrix4x4& transform);
     void drawGradientBackground();   
@@ -81,16 +89,14 @@ private:
         const aiVector3D& v0, const aiVector3D& v1, const aiVector3D& v2,
         float& outT
     );
-    aiNode* findNodeForMesh(aiNode* node, int meshIndex);
-
+    
     QVector3D get3dTranslationVectorFromMousePoints(const QPoint& start, const QPoint& end);
     
     QToolButton* createViewButton(const QString& iconPath, const QString& tooltip, const std::function<void()>& callback, QWidget* parent = nullptr);
 
 private:
     const aiScene* m_scene = nullptr;
-    aiNode* m_highlightedNode = nullptr;
-    Assimp::Importer m_importer;    
+    Assimp::Importer m_importer;   
 
 	GLCamera* m_camera = nullptr; // Custom camera class for handling camera operations
 
@@ -131,7 +137,13 @@ private:
     QMatrix4x4 m_modelMatrix; // Model matrix for transformations
     QMatrix4x4 m_projectionMatrix;     
 
+    int m_lastPickedMeshIndex = -1;
+    aiNode* m_highlightedNode = nullptr;
+    int m_highlightedMeshIndex = -1;
     std::vector<std::unique_ptr<GLMesh>> m_glMeshes;
+    std::map<aiNode*, std::vector<GLMesh*>> m_nodeMeshes; // Store raw pointers
+    std::map<int, GLMesh*> m_meshIndexToGLMesh; // Store raw pointers
+
     ShaderProgram m_shader;
 	ShaderProgram m_backgroundShader; // Shader for background gradient
 	
