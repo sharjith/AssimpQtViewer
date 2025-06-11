@@ -12,7 +12,7 @@ uniform vec3 lightDir;
 out vec4 fragColor;
 
 void main() {
-    vec3 norm = normalize(fragNormal);
+    vec3 norm = normalize(gl_FrontFacing ? fragNormal : -fragNormal);
     vec3 L = normalize(lightDir);
     vec3 V = normalize(viewPos - fragPos);
     
