@@ -119,8 +119,8 @@ void ModelViewerWidget::initializeGL() {
 
 
 	// Load shader sources (for demo, you can hardcode or load from file)
-	m_shader.load(":/shaders/shaders/basic.vert",
-		":/shaders/shaders/basic.frag");
+	m_shader.load(":/shaders/shaders/mesh.vert",
+		":/shaders/shaders/mesh.frag");
 
 	m_backgroundShader.load(":/shaders/shaders/gradientbg.vert",
 		":/shaders/shaders/gradientbg.frag");

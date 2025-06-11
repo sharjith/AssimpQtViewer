@@ -16,11 +16,11 @@
         <file>res/zoomcursor.png</file>
     </qresource>
     <qresource prefix="/shaders">
-        <file>shaders/basic.frag</file>
-        <file>shaders/basic.vert</file>
         <file>shaders/gradientbg.frag</file>
         <file>shaders/gradientbg.vert</file>
         <file>shaders/trihedron.frag</file>
         <file>shaders/trihedron.vert</file>
+        <file>shaders/mesh.frag</file>
+        <file>shaders/mesh.vert</file>
     </qresource>
 </RCC>
