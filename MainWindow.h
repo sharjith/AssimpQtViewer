@@ -32,6 +32,7 @@ private:
     ModelViewerWidget* m_viewerWidget;
     QTreeWidget* m_treeWidget;
     std::unordered_map<aiNode*, QTreeWidgetItem*> m_nodeToItem;
+    std::unordered_map<int, QTreeWidgetItem*> m_meshToItem;
     HighlightDelegate* m_highlightDelegate;
     QLineEdit* m_searchBox;
     QProgressBar* m_progressBar;
