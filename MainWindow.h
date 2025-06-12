@@ -13,8 +13,10 @@ class MainWindow : public QMainWindow {
 public:
     MainWindow(QWidget *parent = nullptr);
 
-private slots:
+public slots:
     void openFile(const QString& path);
+
+private slots:    
     void onTreeItemClicked(QTreeWidgetItem* item, int column);
     void filterTree(const QString& text);
     void showFileReadingProgress(float percent);

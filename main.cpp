@@ -1,5 +1,7 @@
 #include "MainWindow.h"
 #include <QApplication>
+#include <QFileInfo>
+
 
 int main(int argc, char *argv[]) {
 
@@ -19,5 +21,16 @@ int main(int argc, char *argv[]) {
     app.setWindowIcon(QIcon(":/icons/res/icon.png"));
     MainWindow w;
     w.showMaximized();
+
+    if (argc > 1)
+    {
+        QString fileName(argv[1]);
+        QFileInfo fi(fileName);
+        if (fi.exists())
+        {
+            w.openFile(fileName);            
+        }
+    }
+
     return app.exec();
 }
