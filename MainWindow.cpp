@@ -175,14 +175,12 @@ void MainWindow::populateTree(const aiScene* scene) {
 
 				// Use mesh name if available, otherwise use a generic name
 				QString meshName = QString::fromUtf8(mesh->mName.C_Str());
+				
 				if (meshName.isEmpty()) {
-					meshName = QString("Mesh %1").arg(meshIndex + 1);
+					meshName = QString("Mesh_%1").arg(meshIndex + 1);
 				}
-				else {
-					meshItem->setText(0, QString("Mesh %1: %2").arg(meshIndex + 1).arg(meshName));
-				}
-
-				//meshItem->setText(0, meshName);
+				
+				meshItem->setText(0, QString("Mesh %1: %2").arg(meshIndex + 1).arg(meshName));												
 				meshItem->setData(0, Qt::UserRole, QVariant::fromValue<void*>(node)); // Store parent node
 				meshItem->setData(0, Qt::UserRole + 1, meshIndex); // Store mesh index
 
