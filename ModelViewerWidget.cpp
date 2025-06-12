@@ -272,23 +272,38 @@ void ModelViewerWidget::computeBoundingBox(const aiScene* scene, const aiNode* n
 	for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
 		const aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 
-		for (unsigned int j = 0; j < mesh->mNumVertices; ++j) {
-			aiVector3D v = mesh->mVertices[j];
-			v *= currentTransform; // apply transformation
-
-			minimum.x = std::min(minimum.x, v.x);
-			minimum.y = std::min(minimum.y, v.y);
-			minimum.z = std::min(minimum.z, v.z);
-
-			maximum.x = std::max(maximum.x, v.x);
-			maximum.y = std::max(maximum.y, v.y);
-			maximum.z = std::max(maximum.z, v.z);
-		}
+		computeBounds(mesh, currentTransform, minimum, maximum);
 	}
 
 	for (unsigned int i = 0; i < node->mNumChildren; ++i) {
 		computeBoundingBox(scene, node->mChildren[i], minimum, maximum, currentTransform);
 	}
+}
+
+void ModelViewerWidget::computeBounds(const aiMesh* mesh, const aiMatrix4x4& currentTransform, aiVector3D& minimum, aiVector3D& maximum)
+{
+	for (unsigned int j = 0; j < mesh->mNumVertices; ++j) {
+		aiVector3D v = mesh->mVertices[j];
+		v *= currentTransform; // apply transformation
+
+		minimum.x = std::min(minimum.x, v.x);
+		minimum.y = std::min(minimum.y, v.y);
+		minimum.z = std::min(minimum.z, v.z);
+
+		maximum.x = std::max(maximum.x, v.x);
+		maximum.y = std::max(maximum.y, v.y);
+		maximum.z = std::max(maximum.z, v.z);
+	}
+}
+
+void ModelViewerWidget::computeBoundingSphere(const aiMesh* iMesh, const aiMatrix4x4& transform, aiVector3D& oCenter, float& oRadius)
+{
+	aiVector3D minimum(FLT_MAX, FLT_MAX, FLT_MAX);
+	aiVector3D maximum(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+	computeBounds(iMesh, transform, minimum, maximum);
+	oCenter = (aiVector3D(maximum.x, maximum.y, maximum.z) + aiVector3D(minimum.x, minimum.y, minimum.z)) * 0.5f;
+	float maxExtent = std::max({ maximum.x - minimum.x, maximum.y - minimum.y, maximum.z - minimum.z });
+	oRadius = maxExtent * 0.5f;
 }
 
 void ModelViewerWidget::drawGradientBackground() {
@@ -425,17 +440,19 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 
 void ModelViewerWidget::loadNodeMeshes(aiNode* node) {
 
-	/*qDebug() << "Processing node:" << node->mName.C_Str()
-		<< "Meshes:" << node->mNumMeshes
-		<< "Children:" << node->mNumChildren;*/
-
 	// Load meshes for this node
 	for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
 		unsigned int meshIndex = node->mMeshes[i];
 		aiMesh* mesh = m_scene->mMeshes[meshIndex];
 
+		// compute bounding sphere for the mesh
+		aiVector3D oCenter; float oRadius;
+		computeBoundingSphere(mesh, node->mTransformation, oCenter, oRadius);
+
 		//GLMesh* glMesh = new GLMesh(mesh, m_shader.program());
 		auto glMesh = std::make_unique<GLMesh>(mesh, m_shader.program());
+
+		glMesh->setBoundingSphere(QVector3D(oCenter.x, oCenter.y, oCenter.z), oRadius);
 
 		// Set up material (your existing code)
 		Material mat;
@@ -927,6 +944,16 @@ void ModelViewerWidget::pickRay(const aiVector3D& origin, const aiVector3D& dir)
 		for (unsigned i = 0; i < node->mNumMeshes; ++i) {
 			const int meshIndex = node->mMeshes[i];
 			const aiMesh* mesh = m_scene->mMeshes[meshIndex];
+
+			// Bounding sphere intersection check
+			QVector3D cen; float radius;
+			m_meshIndexToGLMesh[meshIndex]->getBoundingSphere(cen, radius);
+			aiVector3D center(cen.x(), cen.y(), cen.z()); // Convert to aiVector3D
+			center *= transform; // Apply transformation to center
+			if (!rayIntersectsSphere(origin, dir, center, radius)) {
+				continue; // Skip this mesh entirely
+			}
+
 			for (unsigned f = 0; f < mesh->mNumFaces; ++f) {
 				const aiFace& face = mesh->mFaces[f];
 				if (face.mNumIndices != 3) continue;
@@ -969,9 +996,25 @@ void ModelViewerWidget::pickRay(const aiVector3D& origin, const aiVector3D& dir)
 		// No mesh hit, clear selection
 		m_lastPickedMeshIndex = -1;
 		highlightMesh(-1);
-	}
+	}	
+
 }
 
+bool ModelViewerWidget::rayIntersectsSphere(const aiVector3D& origin, const aiVector3D& dir, const aiVector3D& center, float radius) {
+	// Vector from the ray origin to the sphere center
+	aiVector3D oc = origin - center;
+
+	// Quadratic equation coefficients
+	float a = dir.SquareLength();  // Since dir should be normalized, a = 1
+	float b = 2.0f * oc * dir;      // Dot product in Assimp
+	float c = oc.SquareLength() - radius * radius;
+
+	// Discriminant of the quadratic equation
+	float discriminant = b * b - 4 * a * c;
+
+	// Ray intersects the sphere if the discriminant is non-negative
+	return discriminant >= 0;
+}
 
 bool ModelViewerWidget::rayIntersectsTriangle(
 	const aiVector3D& orig, const aiVector3D& dir,

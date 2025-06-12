@@ -50,6 +50,13 @@ public:
     QOpenGLBuffer& vbo() { return m_vbo; }
 	QOpenGLBuffer& ebo() { return m_ebo; }
 
+    // Bounding sphere properties
+    float boundingSphereRadius() const { return m_boundingSphereRadius; }
+    const QVector3D& boundingSphereCenter() const { return m_boundingSphereCenter; }
+	void getBoundingSphere(QVector3D& center, float& radius) const { center = m_boundingSphereCenter; radius = m_boundingSphereRadius; }    
+    // Setter for bounding sphere properties
+    void setBoundingSphere(const QVector3D& center, float radius) { m_boundingSphereCenter = center; m_boundingSphereRadius = radius; }
+	
 private:
 
 	aiMesh* m_mesh = nullptr;
@@ -59,6 +66,9 @@ private:
     int m_indexCount = 0;
 	bool m_isSelected = false;  
     Material m_material;
+
+	float m_boundingSphereRadius = 0.0f;
+	QVector3D m_boundingSphereCenter = QVector3D(0.0f, 0.0f, 0.0f);
 
     QMatrix4x4 m_modelMatrix;
     QOpenGLShaderProgram* m_program;

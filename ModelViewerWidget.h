@@ -68,6 +68,8 @@ private:
     void loadNodeMeshes(aiNode* node);
     void computeBoundingBox(const aiScene* scene, const aiNode* node,
         aiVector3D& minimum, aiVector3D& maximum, const aiMatrix4x4& transform);
+    void computeBoundingSphere(const aiMesh* iMesh, const aiMatrix4x4& transform, aiVector3D& oCenter, float& oRadius);
+    void computeBounds(const aiMesh* mesh, const aiMatrix4x4& currentTransform, aiVector3D& minimum, aiVector3D& maximum);
     void drawGradientBackground();   
     void drawTrihedronOverlay();
     GLuint loadTextureIfNeeded(const aiMaterial* material, unsigned int materialIndex);
@@ -84,6 +86,7 @@ private:
     void fitToView();
     void pickAtScreenPosition(const QPoint& pos);
     void pickRay(const aiVector3D& origin, const aiVector3D& dir);
+    bool rayIntersectsSphere(const aiVector3D& origin, const aiVector3D& dir, const aiVector3D& center, float radius);
     bool rayIntersectsTriangle(
         const aiVector3D& orig, const aiVector3D& dir,
         const aiVector3D& v0, const aiVector3D& v1, const aiVector3D& v2,
