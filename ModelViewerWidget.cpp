@@ -363,7 +363,7 @@ void ModelViewerWidget::drawTrihedronOverlay() {
 	}
 	else {
 		// Orthographic projection for overlay
-		float orthoSize = 1.5f;
+		float orthoSize = 1.15f;
 		projection.ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, 0.1f, 10.0f);
 	}
 
