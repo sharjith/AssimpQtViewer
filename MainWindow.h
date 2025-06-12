@@ -14,6 +14,7 @@ public:
     MainWindow(QWidget *parent = nullptr);
 
 private slots:
+    void openFile(const QString& path);
     void onTreeItemClicked(QTreeWidgetItem* item, int column);
     void filterTree(const QString& text);
     void showFileReadingProgress(float percent);
@@ -24,11 +25,15 @@ private:
     void setProgressValue(const int& value);
     void populateTree(const aiScene* scene);
 
+    void updateRecentFilesMenu();
+    void addToRecentFiles(const QString& filePath);
+    void clearRecentFiles();
+
 protected:
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dropEvent(QDropEvent* event) override;
     
-private:
+private: 
     ModelViewerWidget* m_viewerWidget;
     QTreeWidget* m_treeWidget;
     std::unordered_map<aiNode*, QTreeWidgetItem*> m_nodeToItem;
@@ -37,4 +42,10 @@ private:
     QLineEdit* m_searchBox;
     QProgressBar* m_progressBar;
     aiNode* m_currentlySelectedNode = nullptr;
+
+    static const int MaxRecentFiles = 5;
+    QList<QString> recentFiles;
+    QList<QAction*> recentFileActions;
+    QMenu* recentFilesMenu;
+    QAction* separatorAction;
 };

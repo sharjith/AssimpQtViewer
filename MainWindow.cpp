@@ -71,12 +71,46 @@ MainWindow::MainWindow(QWidget* parent)
 	openAct->setShortcut(QKeySequence::Open);
 	connect(openAct, &QAction::triggered, [this]() {
 		QString filePath = QFileDialog::getOpenFileName(this, "Open Model", "", "Model Files (*.obj *.fbx *.dae *.3ds *.stl *.ply *.gltf)");
-		if (!filePath.isEmpty()) loadModel(filePath);
+		if (!filePath.isEmpty()) openFile(filePath);
 		});
+
+		
+	recentFilesMenu = new QMenu(tr("Recent Files"), this);
+	separatorAction = recentFilesMenu->addSeparator();
+	//separatorAction->setSeparator(true);
+	//recentFilesMenu->addAction(separatorAction);
+
+	for (int i = 0; i < MaxRecentFiles; ++i) {
+		QAction* action = new QAction(this);
+		action->setVisible(false);
+		connect(action, &QAction::triggered, this, [=]() {
+			openFile(action->data().toString());
+			});
+		recentFileActions.append(action);
+		recentFilesMenu->addAction(action);
+	}
+
+	recentFilesMenu->addSeparator();
+	recentFilesMenu->addAction(tr("Clear Recent Files"), this, &MainWindow::clearRecentFiles);
+
+	fileMenu->addMenu(recentFilesMenu);
+
+	// add aseparator before recent files
+	fileMenu->addSeparator();
+
+	updateRecentFilesMenu();
 
 	QAction* exitAct = fileMenu->addAction("Exit");
 	exitAct->setShortcut(QKeySequence::Quit);
 	connect(exitAct, &QAction::triggered, this, &QWidget::close);
+
+
+	connect(m_searchBox, &QLineEdit::textChanged, this, &MainWindow::filterTree);
+
+	connect(m_viewerWidget, &ModelViewerWidget::nodePicked,
+		this, &MainWindow::selectTreeNodeFor);
+	connect(m_viewerWidget, &ModelViewerWidget::meshPicked,
+		this, &MainWindow::selectTreeMeshFor);
 
 	QMenu* helpMenu = menuBar()->addMenu("Help");
 	QAction* aboutAct = helpMenu->addAction("About");
@@ -87,16 +121,55 @@ MainWindow::MainWindow(QWidget* parent)
 	QAction* aboutQtAct = helpMenu->addAction("About Qt");
 	connect(aboutQtAct, &QAction::triggered, this, &QApplication::aboutQt);
 
-	connect(m_searchBox, &QLineEdit::textChanged, this, &MainWindow::filterTree);
-	
-	connect(m_viewerWidget, &ModelViewerWidget::nodePicked,
-		this, &MainWindow::selectTreeNodeFor);
-	connect(m_viewerWidget, &ModelViewerWidget::meshPicked,
-		this, &MainWindow::selectTreeMeshFor);
-
 	setAcceptDrops(true);
 
 }
+
+void MainWindow::updateRecentFilesMenu() {
+	QSettings settings("Sharjith N", "Assimp Qt Viewer");
+	recentFiles = settings.value("recentFiles").toStringList();
+
+	int numRecentFiles = qMin(recentFiles.size(), MaxRecentFiles);
+
+	for (int i = 0; i < numRecentFiles; ++i) {
+		QString text = tr("&%1 %2").arg(i + 1).arg(QFileInfo(recentFiles[i]).fileName());
+		recentFileActions[i]->setText(text);
+		recentFileActions[i]->setData(recentFiles[i]);
+		recentFileActions[i]->setVisible(true);
+	}
+
+	for (int i = numRecentFiles; i < MaxRecentFiles; ++i) {
+		recentFileActions[i]->setVisible(false);
+	}
+
+	separatorAction->setVisible(numRecentFiles > 0);
+}
+
+void MainWindow::addToRecentFiles(const QString& filePath) {
+	QSettings settings("Sharjith N", "Assimp Qt Viewer");
+	QStringList files = settings.value("recentFiles").toStringList();
+	files.removeAll(filePath);  // Remove duplicates
+	files.prepend(filePath);    // Add to top
+	while (files.size() > MaxRecentFiles)
+		files.removeLast();
+	settings.setValue("recentFiles", files);
+	updateRecentFilesMenu();
+}
+
+void MainWindow::clearRecentFiles() {
+	QSettings settings("Sharjith N", "Assimp Qt Viewer");
+	settings.remove("recentFiles");
+	updateRecentFilesMenu();
+}
+
+void MainWindow::openFile(const QString& fileName)
+{
+	if (fileName.isEmpty())
+		return;
+	
+	loadModel(fileName);
+}
+
 
 void MainWindow::loadModel(const QString& path) {
 	m_progressBar->setValue(0);
@@ -118,6 +191,7 @@ void MainWindow::loadModel(const QString& path) {
 		populateTree(scene);
 		m_searchBox->show();
 		m_treeWidget->expandAll();
+		addToRecentFiles(path);
 	}
 	
 	m_progressBar->setValue(100);
