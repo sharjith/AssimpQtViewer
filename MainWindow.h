@@ -36,6 +36,8 @@ protected:
     void dropEvent(QDropEvent* event) override;
     
 private: 
+	bool m_modelLoaded = false;
+    QString m_currentModelPath;
     ModelViewerWidget* m_viewerWidget;
     QTreeWidget* m_treeWidget;
     std::unordered_map<aiNode*, QTreeWidgetItem*> m_nodeToItem;

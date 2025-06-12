@@ -12,6 +12,7 @@
 #include <QSplitter>
 #include <QtConcurrent>
 #include <QVBoxLayout>
+#include <QStatusBar>
 
 #include "AssimpProgressHandler.h"
 
@@ -84,7 +85,7 @@ MainWindow::MainWindow(QWidget* parent)
 		QAction* action = new QAction(this);
 		action->setVisible(false);
 		connect(action, &QAction::triggered, this, [=]() {
-			openFile(action->data().toString());
+			openFile(action->data().toString());			
 			});
 		recentFileActions.append(action);
 		recentFilesMenu->addAction(action);
@@ -122,6 +123,8 @@ MainWindow::MainWindow(QWidget* parent)
 	connect(aboutQtAct, &QAction::triggered, this, &QApplication::aboutQt);
 
 	setAcceptDrops(true);
+
+	statusBar()->showMessage("Ready...", 2000);
 
 }
 
@@ -162,12 +165,30 @@ void MainWindow::clearRecentFiles() {
 	updateRecentFilesMenu();
 }
 
-void MainWindow::openFile(const QString& fileName)
+void MainWindow::openFile(const QString& path)
 {
-	if (fileName.isEmpty())
+	QFileInfo fi(path);
+	if (!fi.exists() || !fi.isFile())
 		return;
-	
-	loadModel(fileName);
+
+	QString absolutePath = fi.absoluteFilePath();
+
+	// Skip if already loaded
+	if (absolutePath == m_currentModelPath) {
+		statusBar()->showMessage("Model already loaded", 2000); // 2 sec
+		return;
+	}
+
+	if (m_modelLoaded) {
+		// Open in a new window
+		QProcess::startDetached(QCoreApplication::applicationFilePath(), QStringList() << absolutePath);
+	}
+	else {
+		// Load in this window
+		loadModel(absolutePath);
+		m_modelLoaded = true;
+		m_currentModelPath = absolutePath;  // Store current model
+	}
 }
 
 
