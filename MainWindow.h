@@ -8,6 +8,12 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 
+enum class OpenModelBehavior {
+    Ask,
+    ThisWindow,
+    NewWindow
+};
+
 class MainWindow : public QMainWindow {
     Q_OBJECT
 public:
@@ -30,6 +36,9 @@ private:
     void setProgressValue(const int& value);
     void populateTree(const aiScene* scene);
     void addToRecentFiles(const QString& filePath);
+
+    OpenModelBehavior openModelBehaviorSetting() const;
+    OpenModelBehavior promptOpenModelBehavior();
     
 protected:
     void dragEnterEvent(QDragEnterEvent* event) override;

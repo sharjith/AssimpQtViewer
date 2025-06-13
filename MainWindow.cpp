@@ -13,6 +13,9 @@
 #include <QtConcurrent>
 #include <QVBoxLayout>
 #include <QStatusBar>
+#include <QCheckBox>
+#include <QPushButton>
+#include <QAbstractButton>
 
 #include "AssimpProgressHandler.h"
 
@@ -108,13 +111,14 @@ MainWindow::MainWindow(QWidget* parent)
 	exitAct->setShortcut(QKeySequence::Quit);
 	connect(exitAct, &QAction::triggered, this, &QWidget::close);
 
+	QMenu* settingsMenu = menuBar()->addMenu("Settings");
+	QAction* resetOpenBehavior = new QAction("Reset Open File Behavior", this);
+	connect(resetOpenBehavior, &QAction::triggered, this, [this]() {
+		QSettings().setValue("openModelBehavior", "Ask");
+		QMessageBox::information(this, "Reset", "Open model behavior reset to Ask.");
+		});
+	settingsMenu->addAction(resetOpenBehavior);
 
-	connect(m_searchBox, &QLineEdit::textChanged, this, &MainWindow::filterTree);
-
-	connect(m_viewerWidget, &ModelViewerWidget::nodePicked,
-		this, &MainWindow::selectTreeNodeFor);
-	connect(m_viewerWidget, &ModelViewerWidget::meshPicked,
-		this, &MainWindow::selectTreeMeshFor);
 
 	QMenu* helpMenu = menuBar()->addMenu("Help");
 	QAction* aboutAct = helpMenu->addAction("About");
@@ -124,6 +128,14 @@ MainWindow::MainWindow(QWidget* parent)
 
 	QAction* aboutQtAct = helpMenu->addAction("About Qt");
 	connect(aboutQtAct, &QAction::triggered, this, &QApplication::aboutQt);
+
+
+	connect(m_searchBox, &QLineEdit::textChanged, this, &MainWindow::filterTree);
+
+	connect(m_viewerWidget, &ModelViewerWidget::nodePicked,
+		this, &MainWindow::selectTreeNodeFor);
+	connect(m_viewerWidget, &ModelViewerWidget::meshPicked,
+		this, &MainWindow::selectTreeMeshFor);
 
 	setAcceptDrops(true);
 
@@ -168,6 +180,51 @@ void MainWindow::clearRecentFiles() {
 	updateRecentFilesMenu();
 }
 
+OpenModelBehavior MainWindow::openModelBehaviorSetting() const {
+	QSettings settings;
+	QString value = settings.value("openModelBehavior", "Ask").toString();
+	if (value == "ThisWindow") return OpenModelBehavior::ThisWindow;
+	if (value == "NewWindow") return OpenModelBehavior::NewWindow;
+	return OpenModelBehavior::Ask;
+}
+
+OpenModelBehavior MainWindow::promptOpenModelBehavior()
+{
+	QMessageBox msgBox(this);
+	msgBox.setWindowTitle("Open Model");
+	msgBox.setText("A model is already loaded.");
+	msgBox.setInformativeText("Do you want to open the new model in this window or a new one?");
+	msgBox.setIcon(QMessageBox::Question);
+
+	// Use standard buttons to avoid geometry issues
+	msgBox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+	msgBox.setDefaultButton(QMessageBox::No);
+
+	// Customize labels AFTER setting standard buttons
+	msgBox.button(QMessageBox::Yes)->setText("This Window");
+	msgBox.button(QMessageBox::No)->setText("New Window");
+
+	QCheckBox* rememberCheck = new QCheckBox("Don't ask again");
+	msgBox.setCheckBox(rememberCheck);
+
+	// Force layout stabilization
+	msgBox.adjustSize();
+	QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);  // Flush pending layout events
+
+	// Show dialog (no geometry warning)
+	int ret = msgBox.exec();
+
+	// Save setting if needed
+	if (rememberCheck->isChecked()) {
+		QSettings().setValue("openModelBehavior",
+			(ret == QMessageBox::Yes) ? "ThisWindow" : "NewWindow");
+	}
+
+	return (ret == QMessageBox::Yes) ? OpenModelBehavior::ThisWindow : OpenModelBehavior::NewWindow;
+}
+
+
+
 void MainWindow::openFile(const QString& path)
 {
 	QFileInfo fi(path);
@@ -183,15 +240,23 @@ void MainWindow::openFile(const QString& path)
 	}
 
 	if (m_modelLoaded) {
-		// Open in a new window
-		QProcess::startDetached(QCoreApplication::applicationFilePath(), QStringList() << absolutePath);
-	}
-	else {
-		// Load in this window
-		loadModel(absolutePath);
-		m_modelLoaded = true;
-		m_currentModelPath = absolutePath;  // Store current model
-	}
+
+		OpenModelBehavior behavior = openModelBehaviorSetting();
+
+		if (behavior == OpenModelBehavior::Ask)
+			behavior = promptOpenModelBehavior();
+
+		if (behavior == OpenModelBehavior::NewWindow) {
+			// Open in a new window
+			QProcess::startDetached(QCoreApplication::applicationFilePath(), QStringList() << absolutePath);
+			return;
+		}		
+	}	
+	// Load in this window
+	loadModel(absolutePath);
+	m_modelLoaded = true;
+	m_currentModelPath = absolutePath;  // Store current model
+	
 }
 
 
