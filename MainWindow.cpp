@@ -71,15 +71,18 @@ MainWindow::MainWindow(QWidget* parent)
 	QAction* openAct = fileMenu->addAction("Open");
 	openAct->setShortcut(QKeySequence::Open);
 	connect(openAct, &QAction::triggered, [this]() {
-		QString filePath = QFileDialog::getOpenFileName(this, "Open Model", "", "Model Files (*.obj *.fbx *.dae *.3ds *.stl *.ply *.gltf)");
-		if (!filePath.isEmpty()) openFile(filePath);
+		QString filePath = QFileDialog::getOpenFileName(this, "Open Model", m_lastOpenedDirectory, "Model Files (*.obj *.fbx *.dae *.3ds *.stl *.ply *.gltf)");
+		if (!filePath.isEmpty()) {
+			openFile(filePath);
+			m_lastOpenedDirectory = QFileInfo(filePath).absolutePath(); // Update last opened directory
+		}
 		});
 
 		
 	recentFilesMenu = new QMenu(tr("Recent Files"), this);
 	separatorAction = recentFilesMenu->addSeparator();
-	//separatorAction->setSeparator(true);
-	//recentFilesMenu->addAction(separatorAction);
+	// Connect the aboutToShow signal to updateRecentFiles method
+	connect(recentFilesMenu, &QMenu::aboutToShow, this, &MainWindow::updateRecentFilesMenu);
 
 	for (int i = 0; i < MaxRecentFiles; ++i) {
 		QAction* action = new QAction(this);
