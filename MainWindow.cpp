@@ -27,6 +27,7 @@ MainWindow::MainWindow(QWidget* parent)
 	m_highlightDelegate = delegate; // store as member if needed
 	m_treeWidget->setHeaderHidden(true);
 	connect(m_treeWidget, &QTreeWidget::itemClicked, this, &MainWindow::onTreeItemClicked);
+	connect(m_treeWidget, &QTreeWidget::itemChanged, this, &MainWindow::onItemVisibilityChanged);
 
 	QVBoxLayout* layout = new QVBoxLayout;
 	m_searchBox = new QLineEdit(this);
@@ -136,7 +137,7 @@ MainWindow::MainWindow(QWidget* parent)
 		this, &MainWindow::selectTreeNodeFor);
 	connect(m_viewerWidget, &ModelViewerWidget::meshPicked,
 		this, &MainWindow::selectTreeMeshFor);
-
+	
 	setAcceptDrops(true);
 
 	statusBar()->showMessage("Ready...", 2000);
@@ -222,7 +223,6 @@ OpenModelBehavior MainWindow::promptOpenModelBehavior()
 
 	return (ret == QMessageBox::Yes) ? OpenModelBehavior::ThisWindow : OpenModelBehavior::NewWindow;
 }
-
 
 
 void MainWindow::openFile(const QString& path)
@@ -318,6 +318,7 @@ void MainWindow::populateTree(const aiScene* scene) {
 		QTreeWidgetItem* nodeItem = new QTreeWidgetItem();
 		nodeItem->setText(0, QString::fromUtf8(node->mName.C_Str()));
 		nodeItem->setData(0, Qt::UserRole, QVariant::fromValue<void*>(node));
+		addCheckboxToItem(nodeItem);
 		m_nodeToItem[node] = nodeItem;
 
 		if (parentItem) {
@@ -348,6 +349,7 @@ void MainWindow::populateTree(const aiScene* scene) {
 				meshItem->setData(0, Qt::UserRole + 1, meshIndex); // Store mesh index
 
 				nodeItem->addChild(meshItem);
+				addCheckboxToItem(meshItem, true); 
 
 				// Add mesh mapping
 				m_meshToItem[meshIndex] = meshItem;
@@ -372,6 +374,11 @@ void MainWindow::populateTree(const aiScene* scene) {
 	recurse(scene->mRootNode, nullptr);
 }
 
+void MainWindow::addCheckboxToItem(QTreeWidgetItem* item, bool checked) {
+	item->setFlags(item->flags() | Qt::ItemIsUserCheckable); // Enable checkbox
+	item->setCheckState(0, checked ? Qt::Checked : Qt::Unchecked); // Set initial state
+}
+
 void MainWindow::onTreeItemClicked(QTreeWidgetItem* item, int column) {
 	aiNode* node = static_cast<aiNode*>(item->data(0, Qt::UserRole).value<void*>());
 	QVariant meshIndexData = item->data(0, Qt::UserRole + 1);
@@ -391,6 +398,81 @@ void MainWindow::onTreeItemClicked(QTreeWidgetItem* item, int column) {
 		// Clear selection
 		m_viewerWidget->clearHighlight();
 	}
+}
+
+
+void MainWindow::onItemVisibilityChanged(QTreeWidgetItem* item, int column) {
+	if (column != 0) return; // Only handle the first column (checkbox column)
+		
+	Qt::CheckState state = item->checkState(0); // Get the current checkbox state
+	// Cascade the checkbox state to child items
+	updateChildItems(item, state);
+	updateParentItem(item); // Propagate changes to parent items
+
+	// Retrieve the mesh/node information from the item's data
+	bool isVisible = (state == Qt::Checked);
+
+	if (item->data(0, Qt::UserRole + 1).isValid()) {
+		// Handle mesh visibility
+		unsigned int meshIndex = item->data(0, Qt::UserRole + 1).toUInt();
+		setMeshVisibility(meshIndex, isVisible);
+	}
+}
+
+void MainWindow::updateChildItems(QTreeWidgetItem* parentItem, Qt::CheckState state) {
+	for (int i = 0; i < parentItem->childCount(); ++i) {
+		QTreeWidgetItem* childItem = parentItem->child(i);
+		childItem->setCheckState(0, state); // Update the child item's checkbox state
+		updateChildItems(childItem, state); // Recursively update its children
+	}
+}
+
+void MainWindow::updateParentItem(QTreeWidgetItem* childItem) {
+	QTreeWidgetItem* parentItem = childItem->parent();
+	if (!parentItem) return; // No parent, stop recursion
+
+	// Temporarily block signals to avoid infinite loops
+	m_treeWidget->blockSignals(true);
+
+	bool allChecked = true;
+	bool allUnchecked = true;
+
+	for (int i = 0; i < parentItem->childCount(); ++i) {
+		QTreeWidgetItem* siblingItem = parentItem->child(i);
+		Qt::CheckState siblingState = siblingItem->checkState(0);
+
+		if (siblingState == Qt::Checked) {
+			allUnchecked = false;
+		}
+		else if (siblingState == Qt::Unchecked) {
+			allChecked = false;
+		}
+		else if (siblingState == Qt::PartiallyChecked) {
+			allChecked = false;
+			allUnchecked = false;
+		}
+	}
+
+	if (allChecked) {
+		parentItem->setCheckState(0, Qt::Checked);
+	}
+	else if (allUnchecked) {
+		parentItem->setCheckState(0, Qt::Unchecked);
+	}
+	else {
+		parentItem->setCheckState(0, Qt::PartiallyChecked);
+	}
+
+	// Unblock signals after modifications
+	m_treeWidget->blockSignals(false);
+
+	// Recursively update the parent's parent
+	updateParentItem(parentItem);
+}
+
+void MainWindow::setMeshVisibility(unsigned int meshIndex, bool isVisible) {
+		
+	m_viewerWidget->setMeshVisibility(meshIndex, isVisible);
 }
 
 

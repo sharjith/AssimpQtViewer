@@ -190,6 +190,12 @@ void ModelViewerWidget::paintGL() {
 
 		for (const auto& meshptr : m_glMeshes) {
 			GLMesh* mesh = meshptr.get(); // Use smart pointer to access raw pointer
+
+			// Skip rendering if the mesh is not visible
+			if (!mesh->isVisible()) {
+				continue;
+			}
+
 			bool shouldHighlight = false;
 			m_shader.setUniform("specularColor", mesh->material().specular);
 			m_shader.setUniform("model", mesh->modelMatrix());
@@ -272,7 +278,11 @@ void ModelViewerWidget::computeBoundingBox(const aiScene* scene, const aiNode* n
 	for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
 		const aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
 
-		computeBounds(mesh, currentTransform, minimum, maximum);
+		GLMesh* glMesh = m_meshIndexToGLMesh[node->mMeshes[i]];
+		if(glMesh && glMesh->isVisible()) {
+			// If the mesh is visible, compute its bounds
+			computeBounds(mesh, currentTransform, minimum, maximum);
+		}		
 	}
 
 	for (unsigned int i = 0; i < node->mNumChildren; ++i) {
@@ -947,7 +957,13 @@ void ModelViewerWidget::pickRay(const aiVector3D& origin, const aiVector3D& dir)
 
 			// Bounding sphere intersection check
 			QVector3D cen; float radius;
-			m_meshIndexToGLMesh[meshIndex]->getBoundingSphere(cen, radius);
+			GLMesh* glMesh = m_meshIndexToGLMesh[meshIndex];
+
+			if(glMesh->isVisible() == false) {
+				continue; // Skip invisible meshes
+			}
+
+			glMesh->getBoundingSphere(cen, radius);
 			aiVector3D center(cen.x(), cen.y(), cen.z()); // Convert to aiVector3D
 			center *= transform; // Apply transformation to center
 			if (!rayIntersectsSphere(origin, dir, center, radius)) {
@@ -1062,6 +1078,17 @@ aiNode* ModelViewerWidget::findNodeForMesh(aiNode* node, int meshIndex) {
 	return nullptr;
 }
 
+void ModelViewerWidget::setMeshVisibility(int meshIndex, bool visible) {
+	auto it = m_meshIndexToGLMesh.find(meshIndex);
+	if (it != m_meshIndexToGLMesh.end()) {
+		GLMesh* glMesh = it->second;
+		glMesh->setVisible(visible);		
+		update();
+	}
+	else {
+		qDebug() << "Mesh index" << meshIndex << "not found.";
+	}
+}
 
 QVector3D ModelViewerWidget::get3dTranslationVectorFromMousePoints(const QPoint& start, const QPoint& end)
 {

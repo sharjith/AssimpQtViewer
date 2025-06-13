@@ -24,6 +24,7 @@ public slots:
 
 private slots:    
     void onTreeItemClicked(QTreeWidgetItem* item, int column);
+    void onItemVisibilityChanged(QTreeWidgetItem* item, int column);
     void filterTree(const QString& text);
     void showFileReadingProgress(float percent);
     void updateRecentFilesMenu();
@@ -31,15 +32,19 @@ private slots:
 
 private:
     void selectTreeNodeFor(aiNode* node); // ← this will highlight the node
-    void selectTreeMeshFor(int meshIndex);// ← this will highlight the mesh
+    void selectTreeMeshFor(int meshIndex);// ← this will highlight the mesh    
+    void setMeshVisibility(unsigned int meshIndex, bool isVisible);
+    void updateChildItems(QTreeWidgetItem* parentItem, Qt::CheckState state);
+    void updateParentItem(QTreeWidgetItem* childItem);
     void loadModel(const QString& path);    
     void setProgressValue(const int& value);
     void populateTree(const aiScene* scene);
+    void addCheckboxToItem(QTreeWidgetItem* item, bool checked = true);
     void addToRecentFiles(const QString& filePath);
 
     OpenModelBehavior openModelBehaviorSetting() const;
     OpenModelBehavior promptOpenModelBehavior();
-    
+            
 protected:
     void dragEnterEvent(QDragEnterEvent* event) override;
     void dropEvent(QDropEvent* event) override;

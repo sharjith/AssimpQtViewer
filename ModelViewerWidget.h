@@ -40,6 +40,8 @@ public:
 
     aiNode* findNodeForMesh(aiNode* node, int meshIndex);
 
+	void setMeshVisibility(int meshIndex, bool visible);
+	
 protected:
     void initializeGL() override;
     void resizeGL(int w, int h) override;

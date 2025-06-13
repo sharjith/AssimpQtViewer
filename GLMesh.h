@@ -56,6 +56,10 @@ public:
 	void getBoundingSphere(QVector3D& center, float& radius) const { center = m_boundingSphereCenter; radius = m_boundingSphereRadius; }    
     // Setter for bounding sphere properties
     void setBoundingSphere(const QVector3D& center, float radius) { m_boundingSphereCenter = center; m_boundingSphereRadius = radius; }
+
+	// Visibility control
+    void setVisible(bool visible) { m_visible = visible; }
+	bool isVisible() const { return m_visible; }
 	
 private:
 
@@ -69,6 +73,8 @@ private:
 
 	float m_boundingSphereRadius = 0.0f;
 	QVector3D m_boundingSphereCenter = QVector3D(0.0f, 0.0f, 0.0f);
+
+	bool m_visible = true;
 
     QMatrix4x4 m_modelMatrix;
     QOpenGLShaderProgram* m_program;
