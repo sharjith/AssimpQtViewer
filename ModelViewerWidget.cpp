@@ -1112,46 +1112,41 @@ void ModelViewerWidget::clearSelection() {
 
 QVector3D ModelViewerWidget::get3dTranslationVectorFromMousePoints(const QPoint& start, const QPoint& end)
 {
-	// Determine viewport and camera
-	QRect viewport(0,0,width(), height());
+	QRect viewport(0, 0, width(), height());
 	GLCamera* camera = m_camera;
-
-	// Get view and projection matrices
 	QMatrix4x4 view = camera->getViewMatrix();
 	QMatrix4x4 projection = camera->getProjectionMatrix();
 	QMatrix4x4 inv = (projection * view).inverted();
 
-	// Choose reference Z in world space
-	float referenceWorldZ = 0.0f;
+	float ndcZ = 0.0f;
 	if (camera->getProjectionType() == GLCamera::ProjectionType::ORTHOGRAPHIC) {
-		referenceWorldZ = m_viewCenter.z();
+		QVector4D refWorld(0, 0, m_viewCenter.z(), 1.0f);
+		QVector4D refClip = projection * view * refWorld;
+		ndcZ = refClip.w() != 0.0f ? refClip.z() / refClip.w() : 0.0f;
 	}
 	else {
-		QVector3D focusPoint = camera->getPosition() + camera->getViewDir();
-		referenceWorldZ = focusPoint.z();
+		// Project the actual model center to get its NDC Z
+		QVector4D modelCenterWorld(m_viewCenter.x(), m_viewCenter.y(), m_viewCenter.z(), 1.0f);
+		QVector4D modelCenterClip = projection * view * modelCenterWorld;
+		ndcZ = modelCenterClip.w() != 0.0f ? modelCenterClip.z() / modelCenterClip.w() : 0.0f;
 	}
 
-	// Project reference world point to get NDC Z
-	QVector4D refWorld(0, 0, referenceWorldZ, 1.0f);
-	QVector4D refClip = projection * view * refWorld;
-	float ndcZ = refClip.w() != 0.0f ? refClip.z() / refClip.w() : 0.0f;
-
-	// Helper to convert screen point to NDC
+	// Convert screen points to NDC
 	auto toNDC = [&](const QPoint& pt) {
 		int yInverted = height() - pt.y() - 1;
 		float ndcX = (2.0f * (pt.x() - viewport.x())) / viewport.width() - 1.0f;
 		float ndcY = (2.0f * (yInverted - viewport.y())) / viewport.height() - 1.0f;
 		return QVector2D(ndcX, ndcY);
-	};
+		};
 
 	QVector2D ndcStart2 = toNDC(start);
 	QVector2D ndcEnd2 = toNDC(end);
-
 	QVector4D ndcStart(ndcStart2.x(), ndcStart2.y(), ndcZ, 1.0f);
 	QVector4D ndcEnd(ndcEnd2.x(), ndcEnd2.y(), ndcZ, 1.0f);
 
 	QVector4D worldStart = inv * ndcStart;
 	QVector4D worldEnd = inv * ndcEnd;
+
 	if (worldStart.w() != 0.0f) worldStart /= worldStart.w();
 	if (worldEnd.w() != 0.0f) worldEnd /= worldEnd.w();
 
