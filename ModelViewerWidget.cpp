@@ -707,11 +707,14 @@ void ModelViewerWidget::keyPressEvent(QKeyEvent* event) {
 		}
 	}
 	else {
-		if (event->key() == Qt::Key_Home) {
-			updateCamera();
+		if (event->key() == Qt::Key_F) {
+			fitToView();
+		}
+		if(event->key() == Qt::Key_Home) {
+			// Reset view to default
+			resetView();
 			update();
 		}
-
 		if(event->key() == Qt::Key_Escape) {
 			// Clear selection
 			clearSelection();			
@@ -752,9 +755,8 @@ void ModelViewerWidget::resizeEvent(QResizeEvent* event) {
 
 
 void ModelViewerWidget::resetView() {
-	m_cameraDistance = 0.0f;
-	m_viewCenter = QVector3D(0, 0, 0);
-	m_viewRadius = 1.0f;
+	setViewProjection(ViewProjection::Axonometric);
+	fitToView(); // Reset camera position and zoom
 }
 
 void ModelViewerWidget::setViewProjection(ViewProjection view)
