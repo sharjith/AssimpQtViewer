@@ -20,9 +20,6 @@ ModelViewerTreeWidget::ModelViewerTreeWidget(QWidget* parent)
     // Create context menu
     createContextMenu();
 
-    // Create context menu
-    createContextMenu();
-
     // Connect signals
     connect(this, &QTreeWidget::customContextMenuRequested,
         this, &ModelViewerTreeWidget::showContextMenu);
@@ -41,18 +38,26 @@ void ModelViewerTreeWidget::createContextMenu()
 
     // Create expand action
     m_expandAction = new QAction("Expand All Children", this);
-    m_expandAction->setIcon(QIcon(":/icons/res/expand.png")); // Use your icon path
+    m_expandAction->setIcon(QIcon(":/icons/res/expandall.png")); 
     connect(m_expandAction, &QAction::triggered,
         this, &ModelViewerTreeWidget::expandAllChildren);
 
+    // Create expand to first level action
+    m_expandFirstLevelAction = new QAction("Expand to 1st Level", this);
+    m_expandFirstLevelAction->setIcon(QIcon(":/icons/res/expand.png"));
+    connect(m_expandFirstLevelAction, &QAction::triggered,
+        this, &ModelViewerTreeWidget::expandToFirstLevel);
+
     // Create collapse action
     m_collapseAction = new QAction("Collapse All Children", this);
-    m_collapseAction->setIcon(QIcon(":/icons/res/collapse.png")); // Use your icon path
+    m_collapseAction->setIcon(QIcon(":/icons/res/collapse.png"));
     connect(m_collapseAction, &QAction::triggered,
         this, &ModelViewerTreeWidget::collapseAllChildren);
 
     // Add actions to menu
+    m_contextMenu->addAction(m_expandFirstLevelAction);
     m_contextMenu->addAction(m_expandAction);
+    m_contextMenu->addSeparator();
     m_contextMenu->addAction(m_collapseAction);
 }
 
@@ -99,6 +104,22 @@ bool ModelViewerTreeWidget::isParentNode(QTreeWidgetItem* item)
 {
     return item && item->childCount() > 0;
 }
+
+void ModelViewerTreeWidget::expandToFirstLevel()
+{
+    if (m_contextMenuItem) {
+        // First expand the selected item itself
+        expandItem(m_contextMenuItem);
+
+        // Ensure all immediate children are visible but NOT expanded
+        for (int i = 0; i < m_contextMenuItem->childCount(); ++i) {
+            QTreeWidgetItem* child = m_contextMenuItem->child(i);
+            // Make sure the child is collapsed (don't expand its children)
+            collapseItem(child);
+        }
+    }
+}
+
 
 void ModelViewerTreeWidget::expandItemRecursively(QTreeWidgetItem* item)
 {

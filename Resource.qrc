@@ -16,6 +16,7 @@
         <file>res/zoomcursor.png</file>
         <file>res/collapse.png</file>
         <file>res/expand.png</file>
+        <file>res/expandall.png</file>
     </qresource>
     <qresource prefix="/shaders">
         <file>shaders/gradientbg.frag</file>

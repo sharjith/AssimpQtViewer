@@ -22,6 +22,7 @@ protected:
 
 private slots:
     void expandAllChildren();
+    void expandToFirstLevel();
     void collapseAllChildren();
     void showContextMenu(const QPoint& pos);
 
@@ -33,6 +34,7 @@ private:
 
     QMenu* m_contextMenu;
     QAction* m_expandAction;
+    QAction* m_expandFirstLevelAction;
     QAction* m_collapseAction;
     QTreeWidgetItem* m_contextMenuItem;
 };
