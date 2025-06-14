@@ -78,8 +78,7 @@ MainWindow::MainWindow(QWidget* parent)
 	connect(openAct, &QAction::triggered, [this]() {
 		QString filePath = QFileDialog::getOpenFileName(this, "Open Model", m_lastOpenedDirectory, "Model Files (*.obj *.fbx *.dae *.3ds *.stl *.ply *.gltf)");
 		if (!filePath.isEmpty()) {
-			openFile(filePath);
-			m_lastOpenedDirectory = QFileInfo(filePath).absolutePath(); // Update last opened directory
+			openFile(filePath);			
 		}
 		});
 
@@ -233,6 +232,8 @@ void MainWindow::openFile(const QString& path)
 		return;
 
 	QString absolutePath = fi.absoluteFilePath();
+
+	m_lastOpenedDirectory = QFileInfo(path).absolutePath(); // Update last opened directory
 
 	// Skip if already loaded
 	if (absolutePath == m_currentModelPath) {
