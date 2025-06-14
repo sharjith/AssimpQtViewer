@@ -41,6 +41,23 @@ public:
 	void setMaterial(Material&& material) { m_material = std::move(material); }
 	const Material& material() const { return m_material; }
 
+    void setTexture(GLuint textureId) {
+        if (m_hasTexture) {
+            // delete previous texture if it exists
+            if (m_textureId != 0) {
+                glDeleteTextures(1, &m_textureId);
+            }
+        }
+        else {
+            m_hasTexture = false;
+        }
+        m_textureId = textureId;
+        m_hasTexture = (textureId > 0);
+    }
+
+    bool hasTexture() const { return m_hasTexture; }
+    GLuint getTextureId() const { return m_textureId; }
+
     void setSelected(bool selected) { m_isSelected = selected; }
     bool isSelected() const { return m_isSelected; }
     // Getters for mesh properties
@@ -70,6 +87,8 @@ private:
     int m_indexCount = 0;
 	bool m_isSelected = false;  
     Material m_material;
+    GLuint m_textureId = 0;
+    bool m_hasTexture = false;
 
 	float m_boundingSphereRadius = 0.0f;
 	QVector3D m_boundingSphereCenter = QVector3D(0.0f, 0.0f, 0.0f);

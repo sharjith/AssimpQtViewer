@@ -433,6 +433,10 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 		return;
 	}
 
+	m_lastModelPath = QFileInfo(filePath).absolutePath(); // Store the directory of the loaded model
+
+	m_materialTextureCache.clear(); // Clear previous texture cache
+
 	if (m_scene->mRootNode) {
 		loadNodeMeshes(m_scene->mRootNode);
 
@@ -462,8 +466,10 @@ void ModelViewerWidget::loadNodeMeshes(aiNode* node) {
 
 		glMesh->setBoundingSphere(QVector3D(oCenter.x, oCenter.y, oCenter.z), oRadius);
 
-		// Set up material (your existing code)
+		// Set up material 
 		Material mat;
+		GLuint textureId = 0;
+
 		if (mesh->mMaterialIndex >= 0) {
 			aiMaterial* material = m_scene->mMaterials[mesh->mMaterialIndex];
 			aiColor4D c;
@@ -476,9 +482,18 @@ void ModelViewerWidget::loadNodeMeshes(aiNode* node) {
 			float shininess = 0.0f;
 			if (AI_SUCCESS == material->Get(AI_MATKEY_SHININESS, shininess))
 				mat.shininess = shininess;
+
+			// Load textures - check multiple texture types
+			textureId = loadMaterialTextures(material, mesh->mMaterialIndex);
 		}
 
 		glMesh->setMaterial(mat);
+
+		// Set texture if loaded
+		if (textureId > 0) {
+			glMesh->setTexture(textureId); 
+		}
+
 		glMesh->setupMesh();
 
 		// Store associations - use raw pointer
@@ -496,33 +511,96 @@ void ModelViewerWidget::loadNodeMeshes(aiNode* node) {
 }
 
 
-GLuint ModelViewerWidget::loadTextureIfNeeded(const aiMaterial* material, unsigned int materialIndex)
-{
-	if (m_materialTextureCache.find(materialIndex) != m_materialTextureCache.end())
+// Enhanced texture loading function that handles multiple texture types
+GLuint ModelViewerWidget::loadMaterialTextures(const aiMaterial* material, unsigned int materialIndex) {
+	// Check cache first
+	if (m_materialTextureCache.find(materialIndex) != m_materialTextureCache.end()) {
 		return m_materialTextureCache[materialIndex];
+	}
 
-	if (material->GetTextureCount(aiTextureType_DIFFUSE) > 0) {
-		aiString texturePath;
-		if (material->GetTexture(aiTextureType_DIFFUSE, 0, &texturePath) == AI_SUCCESS) {
-			QString fullPath = QDir(m_lastModelPath).filePath(QString::fromUtf8(texturePath.C_Str()));
-			QImage image(fullPath);
-			if (!image.isNull()) {
-				image = image.convertToFormat(QImage::Format_RGBA8888).mirrored();
-				GLuint texId;
-				glGenTextures(1, &texId);
-				glBindTexture(GL_TEXTURE_2D, texId);
-				glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, image.width(), image.height(), 0,
-					GL_RGBA, GL_UNSIGNED_BYTE, image.bits());
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-				glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-				glGenerateMipmap(GL_TEXTURE_2D);
-				m_materialTextureCache[materialIndex] = texId;
-				return texId;
+	// Try different texture types in order of preference
+	std::vector<aiTextureType> textureTypes = {
+		aiTextureType_DIFFUSE,
+		aiTextureType_SPECULAR,
+		aiTextureType_EMISSIVE,
+		aiTextureType_HEIGHT,
+		aiTextureType_DISPLACEMENT,
+		aiTextureType_OPACITY
+	};
+
+	for (aiTextureType textureType : textureTypes) {
+		if (material->GetTextureCount(textureType) > 0) {
+			aiString texturePath;
+			if (material->GetTexture(textureType, 0, &texturePath) == AI_SUCCESS) {
+				GLuint texId = loadTextureFromPath(texturePath.C_Str());
+				if (texId > 0) {
+					m_materialTextureCache[materialIndex] = texId;
+					return texId;
+				}
 			}
 		}
 	}
 
-	m_materialTextureCache[materialIndex] = 0; // No texture
+	// No texture found
+	m_materialTextureCache[materialIndex] = 0;
+	return 0;
+}
+
+// Separate function to handle the actual texture loading
+GLuint ModelViewerWidget::loadTextureFromPath(const char* texturePath) {
+	// Handle both absolute and relative paths
+	QString fullPath;
+	QFileInfo pathInfo(QString::fromUtf8(texturePath));
+
+	if (pathInfo.isAbsolute()) {
+		fullPath = pathInfo.absoluteFilePath();
+	}
+	else {
+		// Relative path - combine with model directory
+		fullPath = QDir(m_lastModelPath).filePath(QString::fromUtf8(texturePath));
+	}
+
+	// Also try common alternative paths if the direct path fails
+	QStringList pathsToTry = {
+		fullPath,
+		QDir(m_lastModelPath).filePath(pathInfo.fileName()), // Just filename in model dir
+		QDir(m_lastModelPath).filePath("textures/" + pathInfo.fileName()), // Common subfolder
+		QDir(m_lastModelPath).filePath("materials/" + pathInfo.fileName())  // Another common subfolder
+	};
+
+	for (const QString& path : pathsToTry) {
+		QImage image(path);
+		if (!image.isNull()) {
+			// Convert to proper format and flip if needed
+			image = image.convertToFormat(QImage::Format_RGBA8888);
+
+			// Check if image needs to be flipped (common with different modeling software)
+			// You might need to adjust this based on your coordinate system
+			image = image.mirrored();
+
+			GLuint texId;
+			glGenTextures(1, &texId);
+			glBindTexture(GL_TEXTURE_2D, texId);
+
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA,
+				image.width(), image.height(), 0,
+				GL_RGBA, GL_UNSIGNED_BYTE, image.bits());
+
+			// Set texture parameters
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+			glGenerateMipmap(GL_TEXTURE_2D);
+			glBindTexture(GL_TEXTURE_2D, 0); // Unbind
+
+			//qDebug() << "Loaded texture:" << path;
+			return texId;
+		}
+	}
+
+	qWarning() << "Failed to load texture:" << texturePath;
 	return 0;
 }
 

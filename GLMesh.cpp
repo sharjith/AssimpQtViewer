@@ -3,7 +3,7 @@
 #include <assimp/mesh.h>
 #include <QDebug>
 
-GLMesh::GLMesh(aiMesh* mesh, QOpenGLShaderProgram* program) : m_mesh(mesh), m_program(program) {
+GLMesh::GLMesh(aiMesh* mesh, QOpenGLShaderProgram* program) : m_mesh(mesh), m_program(program), m_textureId(0) {
     initializeOpenGLFunctions();    
 }
 
@@ -14,7 +14,8 @@ void GLMesh::setMaterial(const Material& material) {
     m_material = material;
 }
 
-void GLMesh::setupMesh() {
+void GLMesh::setupMesh() {    
+
     QVector<Vertex> vertices;
     QVector<unsigned int> indices;
 
@@ -56,6 +57,18 @@ void GLMesh::setupMesh() {
 }
 
 void GLMesh::draw() {
+
+    // Bind texture if available
+    if (m_hasTexture) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, m_textureId);
+        m_program->setUniformValue("u_texture", 0); // Texture unit 0
+        m_program->setUniformValue("u_hasTexture", true);
+    }
+    else {
+        m_program->setUniformValue("u_hasTexture", false);
+    }
+
     m_program->enableAttributeArray("vertexPosition");
     m_program->enableAttributeArray("vertexNormal");
     m_program->enableAttributeArray("vertexTexCoord");
@@ -69,6 +82,20 @@ void GLMesh::draw() {
 
     m_ebo.bind();
     glDrawElements(GL_TRIANGLES, m_indexCount, GL_UNSIGNED_INT, nullptr);
+
+    // Clean up - disable attributes
+    m_program->disableAttributeArray("vertexPosition");
+    m_program->disableAttributeArray("vertexNormal");
+    m_program->disableAttributeArray("vertexTexCoord");
+    m_program->disableAttributeArray("vertexColor");
+
+    // Unbind texture
+    if (m_hasTexture) {
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+
+    m_vbo.release();
+    m_ebo.release();
 }
 
 void GLMesh::setModelMatrix(const QMatrix4x4& mat) {

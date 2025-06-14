@@ -68,13 +68,14 @@ private slots:
 
 private:   
     void loadNodeMeshes(aiNode* node);
+    GLuint loadMaterialTextures(const aiMaterial* material, unsigned int materialIndex);
+    GLuint loadTextureFromPath(const char* texturePath);
     void computeBoundingBox(const aiScene* scene, const aiNode* node,
         aiVector3D& minimum, aiVector3D& maximum, const aiMatrix4x4& transform);
     void computeBoundingSphere(const aiMesh* iMesh, const aiMatrix4x4& transform, aiVector3D& oCenter, float& oRadius);
     void computeBounds(const aiMesh* mesh, const aiMatrix4x4& currentTransform, aiVector3D& minimum, aiVector3D& maximum);
     void drawGradientBackground();   
-    void drawTrihedronOverlay();
-    GLuint loadTextureIfNeeded(const aiMaterial* material, unsigned int materialIndex);
+    void drawTrihedronOverlay();    
 	void updateCamera();
     void resetView();
     void setViewProjection(ViewProjection view);
