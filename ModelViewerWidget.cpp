@@ -196,23 +196,17 @@ void ModelViewerWidget::paintGL() {
 				continue;
 			}
 
-			bool shouldHighlight = false;
+			
 			m_shader.setUniform("specularColor", mesh->material().specular);
 			m_shader.setUniform("model", mesh->modelMatrix());
 			
 			// Check if this mesh should be highlighted
-			if (m_highlightedMeshIndex >= 0) {
-				// Direct lookup
-				auto it = m_meshIndexToGLMesh.find(m_highlightedMeshIndex);
-				shouldHighlight = (it != m_meshIndexToGLMesh.end() && it->second == mesh);
-			}
-			else if (m_highlightedNode) {
-				// Highlighting node - check if this mesh belongs to the highlighted node
-				auto it = m_nodeMeshes.find(m_highlightedNode);
-				if (it != m_nodeMeshes.end()) {
-					const auto& nodeMeshes = it->second;
-					shouldHighlight = std::find(nodeMeshes.begin(), nodeMeshes.end(), mesh) != nodeMeshes.end();
-				}
+			// Fast lookup using reverse mapping
+			bool shouldHighlight = false;
+			auto it = m_glMeshToIndex.find(mesh);
+			if (it != m_glMeshToIndex.end()) {
+				int meshIndex = it->second;
+				shouldHighlight = m_selectedMeshIndices.find(meshIndex) != m_selectedMeshIndices.end();
 			}
 
 			// Apply highlighting
@@ -441,6 +435,10 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 
 	if (m_scene->mRootNode) {
 		loadNodeMeshes(m_scene->mRootNode);
+
+		for (const auto& pair : m_meshIndexToGLMesh) {
+			m_glMeshToIndex[pair.second] = pair.first;
+		}
 	}
 		
 			
@@ -526,25 +524,6 @@ GLuint ModelViewerWidget::loadTextureIfNeeded(const aiMaterial* material, unsign
 
 	m_materialTextureCache[materialIndex] = 0; // No texture
 	return 0;
-}
-
-
-void ModelViewerWidget::highlightNode(aiNode* node) {
-	m_highlightedNode = node;
-	m_highlightedMeshIndex = -1; // Clear mesh selection
-	update();
-}
-
-void ModelViewerWidget::highlightMesh(int meshIndex) {
-	m_highlightedMeshIndex = meshIndex;
-	m_highlightedNode = nullptr; // Clear node selection
-	update();
-}
-
-void ModelViewerWidget::clearHighlight() {
-	m_highlightedNode = nullptr;
-	m_highlightedMeshIndex = -1;
-	update();
 }
 
 void ModelViewerWidget::mousePressEvent(QMouseEvent* event)
@@ -732,6 +711,23 @@ void ModelViewerWidget::keyPressEvent(QKeyEvent* event) {
 			updateCamera();
 			update();
 		}
+
+		if(event->key() == Qt::Key_Escape) {
+			// Clear selection
+			clearSelection();			
+			update();
+		}
+
+		if (event->key() == Qt::Key_Shift) {
+			m_multiSelectionEnabled = true; // Enable multi-selection mode
+		}
+	}
+}
+
+void ModelViewerWidget::keyReleaseEvent(QKeyEvent* event){
+
+	if(event->key() == Qt::Key_Shift) {
+		m_multiSelectionEnabled = false; // Disable multi-selection mode
 	}
 }
 
@@ -996,23 +992,36 @@ void ModelViewerWidget::pickRay(const aiVector3D& origin, const aiVector3D& dir)
 	traverse(m_scene->mRootNode, aiMatrix4x4());
 
 	if (hitMeshIndex != -1) {
-		// Check if we're clicking the same mesh again
-		if (m_lastPickedMeshIndex == hitMeshIndex) {
-			emit meshPicked(-1); // Signal to deselect  
-			m_lastPickedMeshIndex = -1;
-			highlightMesh(-1); // Clear highlight
+		if (m_multiSelectionEnabled) {
+			// Multi-selection mode
+			if (m_selectedMeshIndices.find(hitMeshIndex) != m_selectedMeshIndices.end()) {
+				m_selectedMeshIndices.erase(hitMeshIndex);
+			}
+			else {
+				m_selectedMeshIndices.insert(hitMeshIndex);
+			}
 		}
 		else {
-			emit meshPicked(hitMeshIndex);
-			m_lastPickedMeshIndex = hitMeshIndex;
-			highlightMesh(hitMeshIndex); // Highlight specific mesh
+			// Single selection mode
+			if (m_selectedMeshIndices.size() == 1 &&
+				m_selectedMeshIndices.find(hitMeshIndex) != m_selectedMeshIndices.end()) {
+				m_selectedMeshIndices.clear();
+			}
+			else {
+				m_selectedMeshIndices.clear();
+				m_selectedMeshIndices.insert(hitMeshIndex);
+			}
 		}
 	}
 	else {
-		// No mesh hit, clear selection
-		m_lastPickedMeshIndex = -1;
-		highlightMesh(-1);
-	}	
+		if (!m_multiSelectionEnabled) {
+			m_selectedMeshIndices.clear();
+		}
+	}
+
+	// Single signal with complete selection state
+	emit selectionChanged(m_selectedMeshIndices);
+	update();
 
 }
 
@@ -1088,6 +1097,17 @@ void ModelViewerWidget::setMeshVisibility(int meshIndex, bool visible) {
 	else {
 		qDebug() << "Mesh index" << meshIndex << "not found.";
 	}
+}
+
+// In ModelViewerWidget
+void ModelViewerWidget::setSelection(const std::unordered_set<int>& meshIndices) {
+	m_selectedMeshIndices = meshIndices;
+	update();
+}
+
+void ModelViewerWidget::clearSelection() {
+	m_selectedMeshIndices.clear();
+	update();
 }
 
 QVector3D ModelViewerWidget::get3dTranslationVectorFromMousePoints(const QPoint& start, const QPoint& end)

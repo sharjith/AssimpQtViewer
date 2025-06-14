@@ -26,8 +26,9 @@ MainWindow::MainWindow(QWidget* parent)
 	m_treeWidget->setItemDelegate(delegate);
 	m_highlightDelegate = delegate; // store as member if needed
 	m_treeWidget->setHeaderHidden(true);
-	connect(m_treeWidget, &QTreeWidget::itemClicked, this, &MainWindow::onTreeItemClicked);
+	m_treeWidget->setSelectionMode(QAbstractItemView::ExtendedSelection);	
 	connect(m_treeWidget, &QTreeWidget::itemChanged, this, &MainWindow::onItemVisibilityChanged);
+	connect(m_treeWidget, &QTreeWidget::itemSelectionChanged,	this, &MainWindow::onTreeSelectionChanged);
 
 	QVBoxLayout* layout = new QVBoxLayout;
 	m_searchBox = new QLineEdit(this);
@@ -134,9 +135,9 @@ MainWindow::MainWindow(QWidget* parent)
 	connect(m_searchBox, &QLineEdit::textChanged, this, &MainWindow::filterTree);
 
 	connect(m_viewerWidget, &ModelViewerWidget::nodePicked,
-		this, &MainWindow::selectTreeNodeFor);
-	connect(m_viewerWidget, &ModelViewerWidget::meshPicked,
-		this, &MainWindow::selectTreeMeshFor);
+		this, &MainWindow::selectTreeNodeFor);	
+	connect(m_viewerWidget, &ModelViewerWidget::selectionChanged,
+		this, &MainWindow::onSelectionChanged);
 	
 	setAcceptDrops(true);
 
@@ -379,25 +380,22 @@ void MainWindow::addCheckboxToItem(QTreeWidgetItem* item, bool checked) {
 	item->setCheckState(0, checked ? Qt::Checked : Qt::Unchecked); // Set initial state
 }
 
-void MainWindow::onTreeItemClicked(QTreeWidgetItem* item, int column) {
-	aiNode* node = static_cast<aiNode*>(item->data(0, Qt::UserRole).value<void*>());
-	QVariant meshIndexData = item->data(0, Qt::UserRole + 1);
+void MainWindow::onSelectionChanged(const std::unordered_set<int>& selectedMeshIndices) {
+	// Block tree signals to prevent recursion
+	m_treeWidget->blockSignals(true);
 
-	if (meshIndexData.isValid()) {
-		// This item represents a specific mesh
-		unsigned int meshIndex = meshIndexData.toUInt();
-		m_viewerWidget->highlightMesh(meshIndex);
+	// Clear current tree selection
+	m_treeWidget->clearSelection();
 
+	// Select corresponding tree items
+	for (int meshIndex : selectedMeshIndices) {
+		QTreeWidgetItem* item = findTreeItemByMeshIndex(meshIndex);
+		if (item) {
+			item->setSelected(true);
+		}
 	}
-	else if (node) {
-		// This is a node item (container or single mesh node)
-		m_viewerWidget->highlightNode(node);
 
-	}
-	else {
-		// Clear selection
-		m_viewerWidget->clearHighlight();
-	}
+	m_treeWidget->blockSignals(false);
 }
 
 
@@ -417,6 +415,80 @@ void MainWindow::onItemVisibilityChanged(QTreeWidgetItem* item, int column) {
 		unsigned int meshIndex = item->data(0, Qt::UserRole + 1).toUInt();
 		setMeshVisibility(meshIndex, isVisible);
 	}
+}
+
+void MainWindow::onTreeSelectionChanged() {
+	// Get all currently selected items in the tree
+	QList<QTreeWidgetItem*> selectedItems = m_treeWidget->selectedItems();
+
+	// Collect all mesh indices from selected items
+	std::unordered_set<int> meshIndices;
+
+	for (QTreeWidgetItem* item : selectedItems) {
+		// Check if this item represents a specific mesh
+		QVariant meshIndexData = item->data(0, Qt::UserRole + 1);
+		if (meshIndexData.isValid()) {
+			// This item represents a specific mesh
+			unsigned int meshIndex = meshIndexData.toUInt();
+			meshIndices.insert(meshIndex);
+		}
+		else {
+			// This is a node item - get all meshes under this node
+			aiNode* node = static_cast<aiNode*>(item->data(0, Qt::UserRole).value<void*>());
+			if (node) {
+				// Collect all mesh indices from this node
+				std::unordered_set<int> nodeMeshes = getMeshIndicesFromNode(node);
+				meshIndices.insert(nodeMeshes.begin(), nodeMeshes.end());
+			}
+		}
+	}
+
+	// Update the 3D viewer selection
+	m_viewerWidget->setSelection(meshIndices);
+}
+
+// Find tree item by mesh index
+QTreeWidgetItem* MainWindow::findTreeItemByMeshIndex(int meshIndex) {
+	std::function<QTreeWidgetItem* (QTreeWidgetItem*)> searchItem;
+	searchItem = [&](QTreeWidgetItem* item) -> QTreeWidgetItem* {
+		// Check if this item matches the mesh index
+		QVariant meshIndexData = item->data(0, Qt::UserRole + 1);
+		if (meshIndexData.isValid() && meshIndexData.toUInt() == meshIndex) {
+			return item;
+		}
+
+		// Search children
+		for (int i = 0; i < item->childCount(); ++i) {
+			QTreeWidgetItem* found = searchItem(item->child(i));
+			if (found) return found;
+		}
+		return nullptr;
+		};
+
+	// Search from root
+	for (int i = 0; i < m_treeWidget->topLevelItemCount(); ++i) {
+		QTreeWidgetItem* found = searchItem(m_treeWidget->topLevelItem(i));
+		if (found) return found;
+	}
+	return nullptr;
+}
+
+// Get all mesh indices from a node (recursively)
+std::unordered_set<int> MainWindow::getMeshIndicesFromNode(aiNode* node) {
+	std::unordered_set<int> meshIndices;
+
+	// Add direct meshes from this node
+	for (unsigned int i = 0; i < node->mNumMeshes; ++i) {
+		meshIndices.insert(node->mMeshes[i]);
+	}
+
+	// Recursively add meshes from child nodes
+	for (unsigned int i = 0; i < node->mNumChildren; ++i) {
+		std::unordered_set<int> childMeshes = getMeshIndicesFromNode(node->mChildren[i]);
+		meshIndices.insert(childMeshes.begin(), childMeshes.end());
+	}
+
+	return meshIndices;
 }
 
 void MainWindow::updateChildItems(QTreeWidgetItem* parentItem, Qt::CheckState state) {

@@ -32,15 +32,15 @@ public:
     explicit ModelViewerWidget(QWidget *parent = nullptr);
     void loadModel(const QString &filePath);    
     const aiScene* getScene() const { return m_scene; }
-    void highlightNode(aiNode *node);
-    void highlightMesh(int meshIndex);
-    void clearHighlight();
-
+    
 	Assimp::Importer* getImporter() { return &m_importer; }
 
     aiNode* findNodeForMesh(aiNode* node, int meshIndex);
 
 	void setMeshVisibility(int meshIndex, bool visible);
+
+    void setSelection(const std::unordered_set<int>& meshIndices);
+    void clearSelection();
 	
 protected:
     void initializeGL() override;
@@ -52,16 +52,16 @@ protected:
 	void mouseReleaseEvent(QMouseEvent* event) override;
 	void wheelEvent(QWheelEvent* event) override;
 	void keyPressEvent(QKeyEvent* event) override;
-	/*void keyReleaseEvent(QKeyEvent* event) override;
-	void focusInEvent(QFocusEvent* event) override;
+	void keyReleaseEvent(QKeyEvent* event) override;
+	/*void focusInEvent(QFocusEvent* event) override;
 	void focusOutEvent(QFocusEvent* event) override;*/
 
     void resizeEvent(QResizeEvent* event) override;
        
 
 signals:
-    void nodePicked(aiNode* node);
-    void meshPicked(int meshIndex);
+    void nodePicked(aiNode* node);    
+    void selectionChanged(const std::unordered_set<int>& selectedMeshIndices);
 
 private slots:
     void onInertiaTimeout();
@@ -141,13 +141,13 @@ private:
 	QMatrix4x4 m_viewMatrix;
     QMatrix4x4 m_modelMatrix; // Model matrix for transformations
     QMatrix4x4 m_projectionMatrix;     
-
-    int m_lastPickedMeshIndex = -1;
-    aiNode* m_highlightedNode = nullptr;
-    int m_highlightedMeshIndex = -1;
+        
+	bool m_multiSelectionEnabled = false; // Enable multi-selection mode
+    std::unordered_set<int> m_selectedMeshIndices;
     std::vector<std::unique_ptr<GLMesh>> m_glMeshes;
-    std::map<aiNode*, std::vector<GLMesh*>> m_nodeMeshes; // Store raw pointers
-    std::map<int, GLMesh*> m_meshIndexToGLMesh; // Store raw pointers
+    std::unordered_map<aiNode*, std::vector<GLMesh*>> m_nodeMeshes; // Store raw pointers
+    std::unordered_map<int, GLMesh*> m_meshIndexToGLMesh; // Store raw pointers
+    std::unordered_map<GLMesh*, int> m_glMeshToIndex;
 
     ShaderProgram m_shader;
 	ShaderProgram m_backgroundShader; // Shader for background gradient

@@ -23,8 +23,9 @@ public slots:
     void openFile(const QString& path);
 
 private slots:    
-    void onTreeItemClicked(QTreeWidgetItem* item, int column);
+    void onSelectionChanged(const std::unordered_set<int>& selectedMeshIndices);    
     void onItemVisibilityChanged(QTreeWidgetItem* item, int column);
+    void onTreeSelectionChanged();
     void filterTree(const QString& text);
     void showFileReadingProgress(float percent);
     void updateRecentFilesMenu();
@@ -34,6 +35,8 @@ private:
     void selectTreeNodeFor(aiNode* node); // ← this will highlight the node
     void selectTreeMeshFor(int meshIndex);// ← this will highlight the mesh    
     void setMeshVisibility(unsigned int meshIndex, bool isVisible);
+    QTreeWidgetItem* findTreeItemByMeshIndex(int meshIndex);
+    std::unordered_set<int> getMeshIndicesFromNode(aiNode* node);
     void updateChildItems(QTreeWidgetItem* parentItem, Qt::CheckState state);
     void updateParentItem(QTreeWidgetItem* childItem);
     void loadModel(const QString& path);    
