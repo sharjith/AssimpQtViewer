@@ -24,6 +24,7 @@ set(SOURCES
     main.cpp
 	MainWindow.cpp
     ModelViewerWidget.cpp    
+    ModelViewerTreeWidget.cpp
     HighlightDelegate.cpp    
     GLCamera.cpp
     GLMesh.cpp
@@ -35,6 +36,7 @@ set(SOURCES
 set(HEADERS
 	MainWindow.h
     ModelViewerWidget.h    
+    ModelViewerTreeWidget.h
     HighlightDelegate.h
     GLCamera.h
     GLMesh.h

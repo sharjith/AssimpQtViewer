@@ -8,6 +8,8 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 
+#include "ModelViewerTreeWidget.h"
+
 enum class OpenModelBehavior {
     Ask,
     ThisWindow,
@@ -57,7 +59,7 @@ private:
     QString m_currentModelPath;
     QString m_lastOpenedDirectory;
     ModelViewerWidget* m_viewerWidget;
-    QTreeWidget* m_treeWidget;
+    ModelViewerTreeWidget* m_treeWidget;
     std::unordered_map<aiNode*, QTreeWidgetItem*> m_nodeToItem;
     std::unordered_map<int, QTreeWidgetItem*> m_meshToItem;
     HighlightDelegate* m_highlightDelegate;

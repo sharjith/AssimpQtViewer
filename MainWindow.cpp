@@ -20,7 +20,7 @@
 #include "AssimpProgressHandler.h"
 
 MainWindow::MainWindow(QWidget* parent)
-	: QMainWindow(parent), m_viewerWidget(new ModelViewerWidget(this)), m_treeWidget(new QTreeWidget(this)) {
+	: QMainWindow(parent), m_viewerWidget(new ModelViewerWidget(this)), m_treeWidget(new ModelViewerTreeWidget(this)) {
 
 	auto* delegate = new HighlightDelegate(m_treeWidget);
 	m_treeWidget->setItemDelegate(delegate);

@@ -14,6 +14,8 @@
         <file>res/pancursor.png</file>
         <file>res/rotatecursor.png</file>
         <file>res/zoomcursor.png</file>
+        <file>res/collapse.png</file>
+        <file>res/expand.png</file>
     </qresource>
     <qresource prefix="/shaders">
         <file>shaders/gradientbg.frag</file>
