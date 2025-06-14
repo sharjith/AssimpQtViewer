@@ -67,7 +67,7 @@ private:
     QProgressBar* m_progressBar;
     aiNode* m_currentlySelectedNode = nullptr;
 
-    static const int MaxRecentFiles = 15;
+    static constexpr int MaxRecentFiles = 15;
     QList<QString> recentFiles;
     QList<QAction*> recentFileActions;
     QMenu* recentFilesMenu;
