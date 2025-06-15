@@ -63,11 +63,19 @@ protected:
 signals:
     void nodePicked(aiNode* node);    
     void selectionChanged(const std::unordered_set<int>& selectedMeshIndices);
+    void meshVisibilityChanged(int meshIndex, bool visible);
+    void allMeshVisibilityChanged(const std::unordered_map<int, bool>& visibilityMap);
 
 private slots:
     void onInertiaTimeout();
+    void showContextMenu(const QPoint& position);
+    void hideSelectedMeshes();
+    void showOnlySelectedMeshes();
+    void centerSelectedMeshes();
+    void showAllMeshes();
 
 private:   
+    void setupContextMenu();
     void loadNodeMeshes(aiNode* node);
     MaterialTextures loadMaterialTextures(const aiMaterial* material, unsigned int materialIndex);
     GLuint loadTextureFromPath(const char* texturePath);
@@ -96,6 +104,8 @@ private:
         const aiVector3D& v0, const aiVector3D& v1, const aiVector3D& v2,
         float& outT
     );
+
+    bool checkIfAnyMeshIsHidden() const;
     
     QVector3D get3dTranslationVectorFromMousePoints(const QPoint& start, const QPoint& end);
     
@@ -152,6 +162,14 @@ private:
     std::unordered_map<aiNode*, std::vector<GLMesh*>> m_nodeMeshes; // Store raw pointers
     std::unordered_map<int, GLMesh*> m_meshIndexToGLMesh; // Store raw pointers
     std::unordered_map<GLMesh*, int> m_glMeshToIndex;
+    std::unordered_map<int, bool> m_visibilityMap;
+
+    QMenu* m_contextMenu = nullptr;
+    QAction* m_hideSelectedAction = nullptr;
+    QAction* m_showOnlySelectedAction = nullptr;
+    QAction* m_centerSelectedAction = nullptr;
+    QAction* m_showAllAction = nullptr;
+    QAction* m_separatorAction = nullptr;
 
     ShaderProgram m_shader;
 	ShaderProgram m_backgroundShader; // Shader for background gradient

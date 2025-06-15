@@ -137,6 +137,11 @@ MainWindow::MainWindow(QWidget* parent)
 		this, &MainWindow::selectTreeNodeFor);	
 	connect(m_viewerWidget, &ModelViewerWidget::selectionChanged,
 		this, &MainWindow::onSelectionChanged);
+
+	connect(m_viewerWidget, &ModelViewerWidget::meshVisibilityChanged,
+		this, &MainWindow::updateTreeItemVisibility);
+	connect(m_viewerWidget, &ModelViewerWidget::allMeshVisibilityChanged,
+		this, &MainWindow::updateAllTreeItemVisibility);
 	
 	setAcceptDrops(true);
 
@@ -446,6 +451,27 @@ void MainWindow::onTreeSelectionChanged() {
 
 	// Update the 3D viewer selection
 	m_viewerWidget->setSelection(meshIndices);
+}
+
+void MainWindow::updateTreeItemVisibility(int meshIndex, bool visible) {
+	QTreeWidgetItem* item = findTreeItemByMeshIndex(meshIndex);
+	if (item) {
+		item->setCheckState(0, visible ? Qt::Checked : Qt::Unchecked);
+	}
+}
+
+void MainWindow::updateAllTreeItemVisibility(const std::unordered_map<int, bool>& visibilityMap) {
+	// Block signals to prevent recursion
+	m_treeWidget->blockSignals(true);
+
+	for (const auto& [meshIndex, visible] : visibilityMap) {
+		QTreeWidgetItem* item = findTreeItemByMeshIndex(meshIndex);
+		if (item) {
+			item->setCheckState(0, visible ? Qt::Checked : Qt::Unchecked);
+		}
+	}
+
+	m_treeWidget->blockSignals(false);
 }
 
 // Find tree item by mesh index

@@ -14,6 +14,7 @@
 #include <QPushButton>
 #include <QTimer>
 #include <QToolButton>
+#include <QMenu>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -85,6 +86,10 @@ ModelViewerWidget::ModelViewerWidget(QWidget* parent)
 		});
 
 	layout->addWidget(projToggleButton);
+
+	setContextMenuPolicy(Qt::CustomContextMenu);	
+	connect(this, &QWidget::customContextMenuRequested,
+		this, &ModelViewerWidget::showContextMenu);
 
 	setFocusPolicy(Qt::StrongFocus);
 }
@@ -452,6 +457,7 @@ void ModelViewerWidget::loadModel(const QString& filePath) {
 
 		for (const auto& pair : m_meshIndexToGLMesh) {
 			m_glMeshToIndex[pair.second] = pair.first;
+			m_visibilityMap[pair.first] = true; // Initialize visibility map
 		}
 	}
 		
@@ -1219,6 +1225,169 @@ void ModelViewerWidget::setSelection(const std::unordered_set<int>& meshIndices)
 void ModelViewerWidget::clearSelection() {
 	m_selectedMeshIndices.clear();
 	update();
+}
+
+void ModelViewerWidget::setupContextMenu() {
+	m_contextMenu = new QMenu(this);
+
+	m_hideSelectedAction = m_contextMenu->addAction("Hide Selected",
+		this, &ModelViewerWidget::hideSelectedMeshes);
+	m_showOnlySelectedAction = m_contextMenu->addAction("Show Only Selected",
+		this, &ModelViewerWidget::showOnlySelectedMeshes);
+	m_centerSelectedAction = m_contextMenu->addAction("Center Selected",
+		this, &ModelViewerWidget::centerSelectedMeshes);
+	m_separatorAction = m_contextMenu->addSeparator();
+	m_showAllAction = m_contextMenu->addAction("Show All",
+		this, &ModelViewerWidget::showAllMeshes);
+}
+
+void ModelViewerWidget::showContextMenu(const QPoint& position) {
+	
+	if(m_glMeshes.empty())
+		return; // No meshes loaded, no context menu
+
+	if (!m_contextMenu) {
+		setupContextMenu();
+	}
+
+	bool hasSelection = !m_selectedMeshIndices.empty();
+	int selectedCount = m_selectedMeshIndices.size();
+
+	if (hasSelection) {
+		// Update action text to show selection count
+		m_hideSelectedAction->setText(QString("Hide Selected (%1)").arg(selectedCount));
+		m_showOnlySelectedAction->setText(QString("Show Only Selected (%1)").arg(selectedCount));
+		m_centerSelectedAction->setText(QString("Center Selected (%1)").arg(selectedCount));
+
+		m_hideSelectedAction->setVisible(true);
+		m_showOnlySelectedAction->setVisible(true);
+		m_centerSelectedAction->setVisible(true);
+		m_separatorAction->setVisible(true);
+	}
+	else {
+		m_hideSelectedAction->setVisible(false);
+		m_showOnlySelectedAction->setVisible(false);
+		m_centerSelectedAction->setVisible(false);
+		m_separatorAction->setVisible(false);
+	}
+
+	m_showAllAction->setVisible(checkIfAnyMeshIsHidden()); // Show "Show All" only if any mesh is hidden
+
+	m_contextMenu->exec(mapToGlobal(position));
+}
+
+bool ModelViewerWidget::checkIfAnyMeshIsHidden() const {
+	// Check if any mesh is hidden
+	for (const auto& [meshIndex, visible] : m_visibilityMap) {
+		if (!visible) {
+			return true;
+		}
+	}
+	return false;
+}
+
+void ModelViewerWidget::hideSelectedMeshes() {
+	
+	for (int meshIndex : m_selectedMeshIndices) {
+		setMeshVisibility(meshIndex, false);
+		m_visibilityMap[meshIndex] = false;
+	}
+	m_selectedMeshIndices.clear(); // Clear selection after hiding
+
+	// Signal MainWindow to update tree checkboxes
+	for (const auto& [meshIndex, visible] : m_visibilityMap) {
+		emit meshVisibilityChanged(meshIndex, visible);
+	}
+	
+	update();	
+}
+
+void ModelViewerWidget::showOnlySelectedMeshes() {
+	
+	for (const auto& pair : m_meshIndexToGLMesh) {
+		pair.second->setVisible(false); // Hide all meshes
+		m_visibilityMap[pair.first] = false;
+	}
+	for (int meshIndex : m_selectedMeshIndices) {
+		setMeshVisibility(meshIndex, true); // Show only selected meshes
+		m_visibilityMap[meshIndex] = true;
+	}
+	emit allMeshVisibilityChanged(m_visibilityMap);
+	centerSelectedMeshes(); // Center on selected meshes
+	clearSelection(); // Clear selection after showing
+	update();
+}
+
+void ModelViewerWidget::centerSelectedMeshes() {
+	if (m_selectedMeshIndices.empty()) return;
+	// Calculate the bounding box of selected meshes
+	
+	QVector3D sceneCenter;
+	float sceneRadius = 0.0f;
+
+	bool first = true;
+
+	for (int meshIndex : m_selectedMeshIndices) {
+		auto it = m_meshIndexToGLMesh.find(meshIndex);
+		if (it != m_meshIndexToGLMesh.end()) {
+			GLMesh* glMesh = it->second;
+			QVector3D center;
+			float radius;
+			glMesh->getBoundingSphere(center, radius);
+
+			if (first) {
+				sceneCenter = center;
+				sceneRadius = radius;
+				first = false;
+				continue;
+			}
+
+			QVector3D toNew = center - sceneCenter;
+			float dist = toNew.length();
+
+			// If the new sphere is already inside the current one, skip
+			if (dist + radius <= sceneRadius) {
+				continue;
+			}
+
+			// If current sphere is inside the new one, adopt new sphere
+			if (dist + sceneRadius <= radius) {
+				sceneCenter = center;
+				sceneRadius = radius;
+				continue;
+			}
+
+			// Otherwise, compute new bounding sphere
+			float newRadius = (sceneRadius + dist + radius) * 0.5f;
+			QVector3D dir = toNew.normalized();
+			if (dist > 1e-5f) {
+				sceneCenter += dir * (newRadius - sceneRadius);
+			}
+			sceneRadius = newRadius;
+		}
+	}
+	
+	m_camera->setViewRange(sceneRadius * 2.1f);
+
+	QVector3D viewPos = sceneCenter;
+	m_camera->setPosition(viewPos);
+
+	m_viewMatrix = m_camera->getViewMatrix();
+	m_projectionMatrix = m_camera->getProjectionMatrix();
+
+	m_sceneUpdated = true;
+	update();
+}
+
+void ModelViewerWidget::showAllMeshes() {
+	
+	for (const auto& pair : m_meshIndexToGLMesh) {
+		pair.second->setVisible(true); // Hide all meshes
+		m_visibilityMap[pair.first] = true;
+	}
+	fitToView(); // Reset camera to fit all meshes
+	// Signal MainWindow to check all tree checkboxes
+	emit allMeshVisibilityChanged(m_visibilityMap);
 }
 
 QVector3D ModelViewerWidget::get3dTranslationVectorFromMousePoints(const QPoint& start, const QPoint& end)

@@ -28,6 +28,8 @@ private slots:
     void onSelectionChanged(const std::unordered_set<int>& selectedMeshIndices);    
     void onItemVisibilityChanged(QTreeWidgetItem* item, int column);
     void onTreeSelectionChanged();
+    void updateTreeItemVisibility(int meshIndex, bool visible);
+    void updateAllTreeItemVisibility(const std::unordered_map<int, bool>& visibilityMap);
     void filterTree(const QString& text);
     void showFileReadingProgress(float percent);
     void updateRecentFilesMenu();
