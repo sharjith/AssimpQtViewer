@@ -26,6 +26,7 @@ enum class ViewProjection {
     Custom
 };
 
+
 class ModelViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core {
     Q_OBJECT
 public:
@@ -68,7 +69,7 @@ private slots:
 
 private:   
     void loadNodeMeshes(aiNode* node);
-    GLuint loadMaterialTextures(const aiMaterial* material, unsigned int materialIndex);
+    MaterialTextures loadMaterialTextures(const aiMaterial* material, unsigned int materialIndex);
     GLuint loadTextureFromPath(const char* texturePath);
     void computeBoundingBox(const aiScene* scene, const aiNode* node,
         aiVector3D& minimum, aiVector3D& maximum, const aiMatrix4x4& transform);
@@ -136,7 +137,9 @@ private:
 	float m_inertiaFactor = 0.75f; // Factor to reduce velocity each frame
     bool m_inertiaActive = false;
         
-    std::unordered_map<unsigned int, GLuint> m_materialTextureCache;
+    //std::unordered_map<unsigned int, GLuint> m_materialTextureCache;
+    std::unordered_map<unsigned int, MaterialTextures> m_materialTextureCache;
+
 	QString m_lastModelPath;
 
 	QMatrix4x4 m_viewMatrix;

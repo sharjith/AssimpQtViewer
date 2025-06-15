@@ -219,6 +219,16 @@ void ModelViewerWidget::paintGL() {
 				glDisable(GL_BLEND);
 				m_shader.setUniform("isSelected", false);
 			}
+
+			if(mesh->hasAnyOpacity()) {
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+				glDepthMask(GL_FALSE);
+			}
+			else {
+				glDisable(GL_BLEND);
+				glDepthMask(GL_TRUE);
+			}
 			mesh->draw();
 		}
 	}
@@ -470,9 +480,12 @@ void ModelViewerWidget::loadNodeMeshes(aiNode* node) {
 		Material mat;
 		GLuint textureId = 0;
 
+		MaterialTextures textures;
+
 		if (mesh->mMaterialIndex >= 0) {
 			aiMaterial* material = m_scene->mMaterials[mesh->mMaterialIndex];
 			aiColor4D c;
+			float opacity = 1.0f;
 			if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_AMBIENT, c))
 				mat.ambient = QVector4D(c.r, c.g, c.b, c.a);
 			if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_DIFFUSE, c))
@@ -482,12 +495,19 @@ void ModelViewerWidget::loadNodeMeshes(aiNode* node) {
 			float shininess = 0.0f;
 			if (AI_SUCCESS == material->Get(AI_MATKEY_SHININESS, shininess))
 				mat.shininess = shininess;
+			if (AI_SUCCESS == material->Get(AI_MATKEY_OPACITY, opacity) && opacity != 0)
+			{
+				if (opacity <= 0.0f)
+					std::cout << "Opacity: " << opacity << " - setting to 1" << std::endl;
+				mat.opacity = opacity;
+			}			
 
 			// Load textures - check multiple texture types
-			textureId = loadMaterialTextures(material, mesh->mMaterialIndex);
+			textures = loadMaterialTextures(material, mesh->mMaterialIndex);			
 		}
 
 		glMesh->setMaterial(mat);
+		glMesh->setTextures(textures);
 
 		// Set texture if loaded
 		if (textureId > 0) {
@@ -512,38 +532,49 @@ void ModelViewerWidget::loadNodeMeshes(aiNode* node) {
 
 
 // Enhanced texture loading function that handles multiple texture types
-GLuint ModelViewerWidget::loadMaterialTextures(const aiMaterial* material, unsigned int materialIndex) {
+MaterialTextures  ModelViewerWidget::loadMaterialTextures(const aiMaterial* material, unsigned int materialIndex) {
 	// Check cache first
-	if (m_materialTextureCache.find(materialIndex) != m_materialTextureCache.end()) {
-		return m_materialTextureCache[materialIndex];
+	auto cacheIt = m_materialTextureCache.find(materialIndex);
+	if (cacheIt != m_materialTextureCache.end()) {
+		return cacheIt->second;
 	}
 
-	// Try different texture types in order of preference
-	std::vector<aiTextureType> textureTypes = {
-		aiTextureType_DIFFUSE,
-		aiTextureType_SPECULAR,
-		aiTextureType_EMISSIVE,
-		aiTextureType_HEIGHT,
-		aiTextureType_DISPLACEMENT,
-		aiTextureType_OPACITY
+	MaterialTextures textures;
+
+	// Define texture type mappings
+	struct TextureMapping {
+		aiTextureType type;
+		GLuint* target;
 	};
 
-	for (aiTextureType textureType : textureTypes) {
-		if (material->GetTextureCount(textureType) > 0) {
+	TextureMapping mappings[] = {
+	   {aiTextureType_DIFFUSE, &textures.diffuse},
+	   {aiTextureType_SPECULAR, &textures.specular},
+	   {aiTextureType_EMISSIVE, &textures.emissive},
+	   {aiTextureType_HEIGHT, &textures.height},
+	   {aiTextureType_DISPLACEMENT, &textures.displacement},
+	   {aiTextureType_OPACITY, &textures.opacity},
+	   {aiTextureType_METALNESS, &textures.metallic},
+	   {aiTextureType_DIFFUSE_ROUGHNESS, &textures.roughness},
+	   {aiTextureType_NORMALS, &textures.normal}
+	};
+
+	// Load each texture type
+	for (const auto& mapping : mappings) {
+		if (material->GetTextureCount(mapping.type) > 0) {
 			aiString texturePath;
-			if (material->GetTexture(textureType, 0, &texturePath) == AI_SUCCESS) {
+			if (material->GetTexture(mapping.type, 0, &texturePath) == AI_SUCCESS) {
 				GLuint texId = loadTextureFromPath(texturePath.C_Str());
 				if (texId > 0) {
-					m_materialTextureCache[materialIndex] = texId;
-					return texId;
+					*(mapping.target) = texId;
 				}
 			}
 		}
 	}
 
-	// No texture found
-	m_materialTextureCache[materialIndex] = 0;
-	return 0;
+	// Cache the result
+	m_materialTextureCache[materialIndex] = textures;
+	return textures;
 }
 
 // Separate function to handle the actual texture loading
@@ -595,7 +626,7 @@ GLuint ModelViewerWidget::loadTextureFromPath(const char* texturePath) {
 			glGenerateMipmap(GL_TEXTURE_2D);
 			glBindTexture(GL_TEXTURE_2D, 0); // Unbind
 
-			//qDebug() << "Loaded texture:" << path;
+			qDebug() << "Loaded texture:" << path;
 			return texId;
 		}
 	}

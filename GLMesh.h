@@ -6,6 +6,7 @@
 #include <QOpenGLVertexArrayObject>
 #include <QMatrix4x4>
 #include <QVector>
+#include <QVector4D>
 #include <QVector3D>
 #include <QVector2D>
 
@@ -19,12 +20,24 @@ struct Vertex {
 };
 
 struct Material {
-    QVector4D ambient;
-    QVector4D diffuse;
-    QVector4D specular;
+    QVector4D ambient = QVector4D(0.3f, 0.3f, 0.3f, 1.0f);
+    QVector4D diffuse = QVector4D(0.5f, 0.4f, 0.3f, 1.0f);;
+    QVector4D specular = QVector4D(0.5f, 0.5f, 0.5f, 1.0f);;
     float shininess = 32.0f;
+	float opacity = 1.0f; // Opacity value (1.0 = fully opaque, 0.0 = fully transparent)
 };
 
+struct MaterialTextures {
+    GLuint diffuse = 0;
+    GLuint specular = 0;
+    GLuint emissive = 0;
+    GLuint height = 0;
+    GLuint displacement = 0;
+    GLuint opacity = 0;
+    GLuint metallic = 0;
+    GLuint roughness = 0;
+    GLuint normal = 0;
+};
 
 class QOpenGLShaderProgram;
 
@@ -41,22 +54,14 @@ public:
 	void setMaterial(Material&& material) { m_material = std::move(material); }
 	const Material& material() const { return m_material; }
 
-    void setTexture(GLuint textureId) {
-        if (m_hasTexture) {
-            // delete previous texture if it exists
-            if (m_textureId != 0) {
-                glDeleteTextures(1, &m_textureId);
-            }
-        }
-        else {
-            m_hasTexture = false;
-        }
-        m_textureId = textureId;
-        m_hasTexture = (textureId > 0);
-    }
+    void setTexture(GLuint textureId);
+
+    void setTextures(const MaterialTextures& textures);
 
     bool hasTexture() const { return m_hasTexture; }
     GLuint getTextureId() const { return m_textureId; }
+
+	bool hasAnyOpacity() const { return m_textures.opacity != 0 || m_material.opacity < 1.0f; }
 
     void setSelected(bool selected) { m_isSelected = selected; }
     bool isSelected() const { return m_isSelected; }
@@ -89,6 +94,9 @@ private:
     Material m_material;
     GLuint m_textureId = 0;
     bool m_hasTexture = false;
+
+    MaterialTextures m_textures;
+    bool m_hasAnyTexture = false;
 
 	float m_boundingSphereRadius = 0.0f;
 	QVector3D m_boundingSphereCenter = QVector3D(0.0f, 0.0f, 0.0f);
