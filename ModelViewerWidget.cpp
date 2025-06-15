@@ -4,6 +4,7 @@
 #include "GLCamera.h"
 #include <assimp/postprocess.h>
 #include <cfloat>
+#include <QApplication>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
@@ -1242,7 +1243,15 @@ void ModelViewerWidget::setupContextMenu() {
 }
 
 void ModelViewerWidget::showContextMenu(const QPoint& position) {
-	
+
+	// Get current keyboard modifiers
+	Qt::KeyboardModifiers modifiers = QApplication::keyboardModifiers();
+
+	// Only show context menu for pure right-click (no modifiers)
+	if (modifiers != Qt::NoModifier) {
+		return;
+	}
+
 	if(m_glMeshes.empty())
 		return; // No meshes loaded, no context menu
 
