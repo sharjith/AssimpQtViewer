@@ -1,6 +1,7 @@
 #include "MainWindow.h"
 #include <QApplication>
 #include <QFileInfo>
+#include <QImageReader>
 
 
 int main(int argc, char *argv[]) {
@@ -15,6 +16,11 @@ int main(int argc, char *argv[]) {
     format.setRenderableType(QSurfaceFormat::OpenGL);
 
     QApplication app(argc, argv);
+
+#if QT_VERSION_MAJOR == 6
+    // Disable allocation limit for images
+    QImageReader::setAllocationLimit(0);
+#endif
     
     QCoreApplication::setOrganizationName("Sharjith N");
 	app.setApplicationName("Assimp Qt Viewer");
