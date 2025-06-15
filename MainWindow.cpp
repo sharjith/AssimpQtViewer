@@ -148,7 +148,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     setAcceptDrops(true);
 
-    statusBar()->showMessage("Ready...", 2000);
+    statusBar()->showMessage("Ready...", 0);
 }
 
 void MainWindow::updateRecentFilesMenu()
@@ -270,8 +270,10 @@ void MainWindow::openFile(const QString &path)
             return;
         }
     }
+	statusBar()->showMessage(QString("Loading model: %1").arg(fi.absoluteFilePath()), 0); // 2 sec
     // Load in this window
     loadModel(absolutePath);
+	statusBar()->showMessage("Loaded model...", 2000); // 2 sec
     m_modelLoaded = true;
     m_currentModelPath = absolutePath; // Store current model
 }
