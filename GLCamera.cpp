@@ -18,339 +18,341 @@
 // GLCamera
 GLCamera::GLCamera() : _width(100.0f), _height(50.0f), _viewRange(200.0f), _FOV(45.0f)
 {
-	_projectionType = ProjectionType::ORTHOGRAPHIC;
-	_viewProj = ViewProjection::SE_ISOMETRIC_VIEW;
-	resetAll();
+    _projectionType = ProjectionType::ORTHOGRAPHIC;
+    _viewProj = ViewProjection::SE_ISOMETRIC_VIEW;
+    resetAll();
 }
 
-GLCamera::GLCamera(float width, float height, float range, float fov) :_width(width), _height(height), _viewRange(range), _FOV(fov)
+GLCamera::GLCamera(float width, float height, float range, float fov) : _width(width), _height(height),
+                                                                        _viewRange(range), _FOV(fov)
 {
-	_projectionType = ProjectionType::ORTHOGRAPHIC;
-	_viewProj = ViewProjection::SE_ISOMETRIC_VIEW;
-	resetAll();
-	updateProjectionMatrix();
+    _projectionType = ProjectionType::ORTHOGRAPHIC;
+    _viewProj = ViewProjection::SE_ISOMETRIC_VIEW;
+    resetAll();
+    updateProjectionMatrix();
 }
 
 void GLCamera::setScreenSize(float w, float h)
 {
-	_width = w;
-	_height = h;
-	updateProjectionMatrix();
+    _width = w;
+    _height = h;
+    updateProjectionMatrix();
 }
 
 QPoint GLCamera::getScreenSize() const
 {
-	return QPoint(_width, _height);
+    return QPoint(_width, _height);
 }
 
 float GLCamera::getAspectRatio() const
 {
-	return _width / _height;
+    return _width / _height;
 }
 
 void GLCamera::setFOV(float fov)
 {
-	_FOV = fov;
-	updateProjectionMatrix();
+    _FOV = fov;
+    updateProjectionMatrix();
 }
 
 float GLCamera::getFOV() const
 {
-	return _FOV;
+    return _FOV;
 }
 
 void GLCamera::setViewRange(float range)
 {
-	_viewRange = range;
-	updateProjectionMatrix();
+    _viewRange = range;
+    updateProjectionMatrix();
 }
 
 float GLCamera::getViewRange() const
 {
-	return _viewRange;
+    return _viewRange;
 }
 
 void GLCamera::setProjectionType(ProjectionType proj)
 {
-	_projectionType = proj;
-	updateProjectionMatrix();
+    _projectionType = proj;
+    updateProjectionMatrix();
 }
 
 GLCamera::ProjectionType GLCamera::getProjectionType() const
 {
-	return _projectionType;
+    return _projectionType;
 }
 
 void GLCamera::resetAll(void)
 {
-	//Init with standard OGL values:
-	_position = QVector3D(0.0, 0.0, 0.0);
-	_viewDir = QVector3D(0.0, 0.0, -1.0);
-	_rightVector = QVector3D(1.0, 0.0, 0.0);
-	_upVector = QVector3D(0.0, 1.0, 0.0);
+    //Init with standard OGL values:
+    _position = QVector3D(0.0, 0.0, 0.0);
+    _viewDir = QVector3D(0.0, 0.0, -1.0);
+    _rightVector = QVector3D(1.0, 0.0, 0.0);
+    _upVector = QVector3D(0.0, 1.0, 0.0);
 
-	//Only to be sure:
-	_rotatedX = _rotatedY = _rotatedZ = 0.0;
+    //Only to be sure:
+    _rotatedX = _rotatedY = _rotatedZ = 0.0;
 
-	_viewMatrix.setToIdentity();
-	updateViewMatrix();
+    _viewMatrix.setToIdentity();
+    updateViewMatrix();
 }
 
 void GLCamera::updateViewMatrix(void)
 {
-	_viewMatrix.setToIdentity();
-	//The point at which the camera looks:
-	QVector3D viewPoint = _position + _viewDir;
+    _viewMatrix.setToIdentity();
+    //The point at which the camera looks:
+    QVector3D viewPoint = _position + _viewDir;
 
-	//as we know the up vector, we can easily use gluLookAt:
-	_viewMatrix.lookAt(_position, viewPoint, _upVector);
+    //as we know the up vector, we can easily use gluLookAt:
+    _viewMatrix.lookAt(_position, viewPoint, _upVector);
 
-	QQuaternion quat = QQuaternion::fromRotationMatrix(_viewMatrix.toGenericMatrix<3, 3>());
-	quat.getEulerAngles(&_rotatedY, &_rotatedZ, &_rotatedX);
+    QQuaternion quat = QQuaternion::fromRotationMatrix(_viewMatrix.toGenericMatrix<3, 3>());
+    quat.getEulerAngles(&_rotatedY, &_rotatedZ, &_rotatedX);
 }
 
 void GLCamera::updateProjectionMatrix(void)
 {
-	_projectionMatrix.setToIdentity();
-	float w = _width;
-	float h = _height;
-	float halfRange = _viewRange / 2;
-	if (h == 0)
-		h = 1.0;
-	if (_projectionType == ProjectionType::ORTHOGRAPHIC)
-	{
-		if (w <= h)
-			_projectionMatrix.ortho(-halfRange, halfRange,
-				-halfRange * h / w, halfRange * h / w,
-				-halfRange * 1000, halfRange * 1000);
-		else
-			_projectionMatrix.ortho(-halfRange * w / h, halfRange * w / h,
-				-halfRange, halfRange,
-				-halfRange * 1000, halfRange * 1000);
-	}
-	else
-	{
-		float aspect = w / h;
-		float camnear = _viewRange * 0.01f;
-		float camfar = _viewRange * 10000.0f;
-		_projectionMatrix.perspective(_FOV, aspect, camnear, camfar);
+    _projectionMatrix.setToIdentity();
+    float w = _width;
+    float h = _height;
+    float halfRange = _viewRange / 2;
+    if (h == 0)
+        h = 1.0;
+    if (_projectionType == ProjectionType::ORTHOGRAPHIC)
+    {
+        if (w <= h)
+            _projectionMatrix.ortho(-halfRange, halfRange,
+                                    -halfRange * h / w, halfRange * h / w,
+                                    -halfRange * 1000, halfRange * 1000);
+        else
+            _projectionMatrix.ortho(-halfRange * w / h, halfRange * w / h,
+                                    -halfRange, halfRange,
+                                    -halfRange * 1000, halfRange * 1000);
+    } else
+    {
+        float aspect = w / h;
+        float camnear = _viewRange * 0.01f;
+        float camfar = _viewRange * 10000.0f;
+        _projectionMatrix.perspective(_FOV, aspect, camnear, camfar);
 
-		float shift = -_viewRange * 1.5f;
-		_projectionMatrix.translate(0.0f, 0.0f, shift);
-	}
+        float shift = -_viewRange * 1.5f;
+        _projectionMatrix.translate(0.0f, 0.0f, shift);
+    }
 }
 
 void GLCamera::rotateX(float iAngle)
 {
-	_rotatedX += iAngle;
+    _rotatedX += iAngle;
 
-	if ((_rotatedX > 360.0) || (_rotatedX < -360.0))
-	{
-		_rotatedX = 0;
-	}
+    if ((_rotatedX > 360.0) || (_rotatedX < -360.0))
+    {
+        _rotatedX = 0;
+    }
 
-	//Rotate viewdir around the right vector:
-	_viewDir = QVector3D(QVector3D(_viewDir * cos(iAngle * PIdiv180)) + _upVector * sin(iAngle * PIdiv180)).normalized();
-	_viewDir.normalize();
-	//now compute the new _upVector (by cross product)
-	_upVector = QVector3D::crossProduct(_viewDir, _rightVector) * -1;
-	_upVector.normalize();
+    //Rotate viewdir around the right vector:
+    _viewDir = QVector3D(QVector3D(_viewDir * cos(iAngle * PIdiv180)) + _upVector * sin(iAngle * PIdiv180)).
+            normalized();
+    _viewDir.normalize();
+    //now compute the new _upVector (by cross product)
+    _upVector = QVector3D::crossProduct(_viewDir, _rightVector) * -1;
+    _upVector.normalize();
 
-	updateViewMatrix();
+    updateViewMatrix();
 }
 
 void GLCamera::rotateY(float iAngle)
 {
-	_rotatedY += iAngle;
+    _rotatedY += iAngle;
 
-	if ((_rotatedY > 360.0) || (_rotatedY < -360.0))
-	{
-		_rotatedY = 0;
-	}
+    if ((_rotatedY > 360.0) || (_rotatedY < -360.0))
+    {
+        _rotatedY = 0;
+    }
 
-	//Rotate viewdir around the up vector:
-	_viewDir = QVector3D(QVector3D(_viewDir * cos(iAngle * PIdiv180)) - _rightVector * sin(iAngle * PIdiv180)).normalized();
-	_viewDir.normalize();
-	//now compute the new _rightVector (by cross product)
-	_rightVector = QVector3D::crossProduct(_viewDir, _upVector);
-	_rightVector.normalize();
+    //Rotate viewdir around the up vector:
+    _viewDir = QVector3D(QVector3D(_viewDir * cos(iAngle * PIdiv180)) - _rightVector * sin(iAngle * PIdiv180)).
+            normalized();
+    _viewDir.normalize();
+    //now compute the new _rightVector (by cross product)
+    _rightVector = QVector3D::crossProduct(_viewDir, _upVector);
+    _rightVector.normalize();
 
-	updateViewMatrix();
+    updateViewMatrix();
 }
 
 void GLCamera::rotateZ(float iAngle)
 {
-	_rotatedZ += iAngle;
+    _rotatedZ += iAngle;
 
-	if ((_rotatedZ > 360.0) || (_rotatedZ < -360.0))
-	{
-		_rotatedZ = 0;
-	}
+    if ((_rotatedZ > 360.0) || (_rotatedZ < -360.0))
+    {
+        _rotatedZ = 0;
+    }
 
-	//Rotate viewdir around the right vector:
-	_rightVector = QVector3D(QVector3D(_rightVector * cos(iAngle * PIdiv180)) + _upVector * sin(iAngle * PIdiv180)).normalized();
-	_rightVector.normalize();
-	//now compute the new _upVector (by cross product)
-	_upVector = QVector3D::crossProduct(_viewDir, _rightVector) * -1;
-	_upVector.normalize();
+    //Rotate viewdir around the right vector:
+    _rightVector = QVector3D(QVector3D(_rightVector * cos(iAngle * PIdiv180)) + _upVector * sin(iAngle * PIdiv180)).
+            normalized();
+    _rightVector.normalize();
+    //now compute the new _upVector (by cross product)
+    _upVector = QVector3D::crossProduct(_viewDir, _rightVector) * -1;
+    _upVector.normalize();
 
-	updateViewMatrix();
+    updateViewMatrix();
 }
 
 void GLCamera::move(float iDX, float iDY, float iDZ)
 {
-	QVector3D Dir(iDX, iDY, iDZ);
-	_position = _position + Dir;
-	updateViewMatrix();
+    QVector3D Dir(iDX, iDY, iDZ);
+    _position = _position + Dir;
+    updateViewMatrix();
 }
 
 void GLCamera::moveForward(float iDist)
 {
-	_position = _position + (_viewDir * -iDist);
-	updateViewMatrix();
+    _position = _position + (_viewDir * -iDist);
+    updateViewMatrix();
 }
 
 void GLCamera::moveUpward(float iDist)
 {
-	_position = _position + (_upVector * iDist);
-	updateViewMatrix();
+    _position = _position + (_upVector * iDist);
+    updateViewMatrix();
 }
 
 void GLCamera::moveAcross(float iDist)
 {
-	_position = _position + (_rightVector * iDist);
-	updateViewMatrix();
+    _position = _position + (_rightVector * iDist);
+    updateViewMatrix();
 }
 
 void GLCamera::setView(ViewProjection iProj)
 {
-	//_position = QVector3D();
-	_viewDir = QVector3D(0.0, 0.0, -1.0);
-	_rightVector = QVector3D(1.0, 0.0, 0.0);
-	_upVector = QVector3D(0.0, 1.0, 0.0);
-	_rotatedX = _rotatedY = _rotatedZ = 0.0;
+    //_position = QVector3D();
+    _viewDir = QVector3D(0.0, 0.0, -1.0);
+    _rightVector = QVector3D(1.0, 0.0, 0.0);
+    _upVector = QVector3D(0.0, 1.0, 0.0);
+    _rotatedX = _rotatedY = _rotatedZ = 0.0;
 
-	_viewProj = iProj;
-	switch (_viewProj)
-	{
-	case ViewProjection::TOP_VIEW:
-		_viewDir = QVector3D(0.0, 0.0, -1.0);
-		_rightVector = QVector3D(1.0, 0.0, 0.0);
-		_upVector = QVector3D(0.0, 1.0, 0.0);
-		break;
-	case ViewProjection::BOTTOM_VIEW:
-		_viewDir = QVector3D(0.0, 0.0, 1.0);
-		_rightVector = QVector3D(1.0, 0.0, 0.0);
-		_upVector = QVector3D(0.0, -1.0, 0.0);
-		break;
-	case ViewProjection::FRONT_VIEW:
-		_viewDir = QVector3D(0.0, 1.0, 0.0);
-		_rightVector = QVector3D(1.0, 0.0, 0.0);
-		_upVector = QVector3D(0.0, 0.0, 1.0);
-		break;
-	case ViewProjection::REAR_VIEW:
-		_viewDir = QVector3D(0.0, -1.0, 0.0);
-		_rightVector = QVector3D(-1.0, 0.0, 0.0);
-		_upVector = QVector3D(0.0, 0.0, 1.0);
-		break;
-	case ViewProjection::LEFT_VIEW:
-		_viewDir = QVector3D(-1.0, 0.0, 0.0);
-		_rightVector = QVector3D(0.0, 1.0, 0.0);
-		_upVector = QVector3D(0.0, 0.0, 1.0);
-		break;
-	case ViewProjection::RIGHT_VIEW:
-		_viewDir = QVector3D(1.0, 0.0, 0.0);
-		_rightVector = QVector3D(0.0, -1.0, 0.0);
-		_upVector = QVector3D(0.0, 0.0, 1.0);
-		break;
-	case ViewProjection::DIMETRIC_VIEW:
-		_viewDir = QVector3D(-2.0, 2.0, -1);
-		_rightVector = QVector3D(1, 1, 0);
-		_upVector = QVector3D(-1, 1, 0);
-		break;
-	case ViewProjection::TRIMETRIC_VIEW:
-		_viewDir = QVector3D(-0.486f, 0.732f, -0.477f);
-		_rightVector = QVector3D(1.181f, 0.778f, 0.010f);
-		_upVector = QVector3D(-0.363f, 0.568f, 1.243f);
-		break;
-	case ViewProjection::NW_ISOMETRIC_VIEW:
-		_viewDir = QVector3D(1, -1, -1);
-		_rightVector = QVector3D(-1, -1, 0);
-		_upVector = QVector3D(1, -1, 1);
-		break;
-	case ViewProjection::SW_ISOMETRIC_VIEW:
-		_viewDir = QVector3D(1, 1, -1);
-		_rightVector = QVector3D(1, -1, 0);
-		_upVector = QVector3D(1, 1, 0);
-		break;
-	case ViewProjection::NE_ISOMETRIC_VIEW:
-		_viewDir = QVector3D(-1, -1, -1);
-		_rightVector = QVector3D(-1, 1, 0);
-		_upVector = QVector3D(-1, -1, 1);
-		break;
-	case ViewProjection::SE_ISOMETRIC_VIEW:
-	default:
-		_viewDir = QVector3D(-1, 1, -1);
-		_rightVector = QVector3D(1, 1, 0);
-		_upVector = QVector3D(-1, 1, 0);
-		break;
-	}
-	// Update the rotation angles
-	float rx, ry, rz;
-	getRotationAngles(&ry, &rz, &rx);
-	_rotatedX = rx;
-	_rotatedY = ry;
-	_rotatedZ = rz;
+    _viewProj = iProj;
+    switch (_viewProj)
+    {
+        case ViewProjection::TOP_VIEW:
+            _viewDir = QVector3D(0.0, 0.0, -1.0);
+            _rightVector = QVector3D(1.0, 0.0, 0.0);
+            _upVector = QVector3D(0.0, 1.0, 0.0);
+            break;
+        case ViewProjection::BOTTOM_VIEW:
+            _viewDir = QVector3D(0.0, 0.0, 1.0);
+            _rightVector = QVector3D(1.0, 0.0, 0.0);
+            _upVector = QVector3D(0.0, -1.0, 0.0);
+            break;
+        case ViewProjection::FRONT_VIEW:
+            _viewDir = QVector3D(0.0, 1.0, 0.0);
+            _rightVector = QVector3D(1.0, 0.0, 0.0);
+            _upVector = QVector3D(0.0, 0.0, 1.0);
+            break;
+        case ViewProjection::REAR_VIEW:
+            _viewDir = QVector3D(0.0, -1.0, 0.0);
+            _rightVector = QVector3D(-1.0, 0.0, 0.0);
+            _upVector = QVector3D(0.0, 0.0, 1.0);
+            break;
+        case ViewProjection::LEFT_VIEW:
+            _viewDir = QVector3D(-1.0, 0.0, 0.0);
+            _rightVector = QVector3D(0.0, 1.0, 0.0);
+            _upVector = QVector3D(0.0, 0.0, 1.0);
+            break;
+        case ViewProjection::RIGHT_VIEW:
+            _viewDir = QVector3D(1.0, 0.0, 0.0);
+            _rightVector = QVector3D(0.0, -1.0, 0.0);
+            _upVector = QVector3D(0.0, 0.0, 1.0);
+            break;
+        case ViewProjection::DIMETRIC_VIEW:
+            _viewDir = QVector3D(-2.0, 2.0, -1);
+            _rightVector = QVector3D(1, 1, 0);
+            _upVector = QVector3D(-1, 1, 0);
+            break;
+        case ViewProjection::TRIMETRIC_VIEW:
+            _viewDir = QVector3D(-0.486f, 0.732f, -0.477f);
+            _rightVector = QVector3D(1.181f, 0.778f, 0.010f);
+            _upVector = QVector3D(-0.363f, 0.568f, 1.243f);
+            break;
+        case ViewProjection::NW_ISOMETRIC_VIEW:
+            _viewDir = QVector3D(1, -1, -1);
+            _rightVector = QVector3D(-1, -1, 0);
+            _upVector = QVector3D(1, -1, 1);
+            break;
+        case ViewProjection::SW_ISOMETRIC_VIEW:
+            _viewDir = QVector3D(1, 1, -1);
+            _rightVector = QVector3D(1, -1, 0);
+            _upVector = QVector3D(1, 1, 0);
+            break;
+        case ViewProjection::NE_ISOMETRIC_VIEW:
+            _viewDir = QVector3D(-1, -1, -1);
+            _rightVector = QVector3D(-1, 1, 0);
+            _upVector = QVector3D(-1, -1, 1);
+            break;
+        case ViewProjection::SE_ISOMETRIC_VIEW:
+        default:
+            _viewDir = QVector3D(-1, 1, -1);
+            _rightVector = QVector3D(1, 1, 0);
+            _upVector = QVector3D(-1, 1, 0);
+            break;
+    }
+    // Update the rotation angles
+    float rx, ry, rz;
+    getRotationAngles(&ry, &rz, &rx);
+    _rotatedX = rx;
+    _rotatedY = ry;
+    _rotatedZ = rz;
 
-	updateViewMatrix();
-
+    updateViewMatrix();
 }
 
 void GLCamera::setView(QVector3D viewPos, QVector3D viewDir, QVector3D upDir, QVector3D rightDir)
 {
-	_position = viewPos;
-	_viewDir = viewDir;
-	_upVector = upDir;
-	_rightVector = rightDir; // QVector3D::crossProduct(_viewDir, _upVector);
+    _position = viewPos;
+    _viewDir = viewDir;
+    _upVector = upDir;
+    _rightVector = rightDir; // QVector3D::crossProduct(_viewDir, _upVector);
 
-	// Update the rotation angles
-	float rx, ry, rz;
-	getRotationAngles(&ry, &rz, &rx);
-	_rotatedX = rx;
-	_rotatedY = ry;
-	_rotatedZ = rz;
+    // Update the rotation angles
+    float rx, ry, rz;
+    getRotationAngles(&ry, &rz, &rx);
+    _rotatedX = rx;
+    _rotatedY = ry;
+    _rotatedZ = rz;
 
-	updateViewMatrix();
+    updateViewMatrix();
 }
 
 void GLCamera::setPosition(float iX, float iY, float iZ)
 {
-	_position.setX(iX);
-	_position.setY(iY);
-	_position.setZ(iZ);
-	updateViewMatrix();
+    _position.setX(iX);
+    _position.setY(iY);
+    _position.setZ(iZ);
+    updateViewMatrix();
 }
 
 void GLCamera::setPosition(QVector3D pos)
 {
-	setPosition(pos.x(), pos.y(), pos.z());
+    setPosition(pos.x(), pos.y(), pos.z());
 }
 
-void GLCamera::getRotationAngles(float* oPitch, float* oYaw, float* oRoll)
+void GLCamera::getRotationAngles(float *oPitch, float *oYaw, float *oRoll)
 {
-	QQuaternion quat = QQuaternion::fromRotationMatrix(_viewMatrix.toGenericMatrix<3, 3>());
-	QVector3D euler = quat.toEulerAngles();
-	*oPitch = euler.y();
-	*oYaw = euler.z();
-	*oRoll = euler.x();
+    QQuaternion quat = QQuaternion::fromRotationMatrix(_viewMatrix.toGenericMatrix<3, 3>());
+    QVector3D euler = quat.toEulerAngles();
+    *oPitch = euler.y();
+    *oYaw = euler.z();
+    *oRoll = euler.x();
 }
 
 void GLCamera::setViewMatrix(QMatrix4x4 mat)
 {
-	_viewMatrix = mat;
+    _viewMatrix = mat;
 }
 
 void GLCamera::setProjectionMatrix(QMatrix4x4 mat)
 {
-	_projectionMatrix = mat;
+    _projectionMatrix = mat;
 }

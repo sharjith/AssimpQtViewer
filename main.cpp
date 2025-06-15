@@ -4,8 +4,8 @@
 #include <QImageReader>
 
 
-int main(int argc, char *argv[]) {
-
+int main(int argc, char *argv[])
+{
     QSurfaceFormat format;
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);
@@ -21,9 +21,9 @@ int main(int argc, char *argv[]) {
     // Disable allocation limit for images
     QImageReader::setAllocationLimit(0);
 #endif
-    
+
     QCoreApplication::setOrganizationName("Sharjith N");
-	app.setApplicationName("Assimp Qt Viewer");
+    app.setApplicationName("Assimp Qt Viewer");
     app.setWindowIcon(QIcon(":/icons/res/icon.png"));
     MainWindow w;
     w.showMaximized();
@@ -34,7 +34,7 @@ int main(int argc, char *argv[]) {
         QFileInfo fi(fileName);
         if (fi.exists())
         {
-            w.openFile(fileName);            
+            w.openFile(fileName);
         }
     }
 

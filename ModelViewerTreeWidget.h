@@ -14,29 +14,36 @@ class ModelViewerTreeWidget : public QTreeWidget
     Q_OBJECT
 
 public:
-    explicit ModelViewerTreeWidget(QWidget* parent = nullptr);
+    explicit ModelViewerTreeWidget(QWidget *parent = nullptr);
+
     ~ModelViewerTreeWidget();
 
 protected:
-    void contextMenuEvent(QContextMenuEvent* event) override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
 
 private slots:
     void expandAllChildren();
+
     void expandToFirstLevel();
+
     void collapseAllChildren();
-    void showContextMenu(const QPoint& pos);
+
+    void showContextMenu(const QPoint &pos);
 
 private:
     void createContextMenu();
-    bool isParentNode(QTreeWidgetItem* item);
-    void expandItemRecursively(QTreeWidgetItem* item);
-    void collapseItemRecursively(QTreeWidgetItem* item);
 
-    QMenu* m_contextMenu;
-    QAction* m_expandAction;
-    QAction* m_expandFirstLevelAction;
-    QAction* m_collapseAction;
-    QTreeWidgetItem* m_contextMenuItem;
+    bool isParentNode(QTreeWidgetItem *item);
+
+    void expandItemRecursively(QTreeWidgetItem *item);
+
+    void collapseItemRecursively(QTreeWidgetItem *item);
+
+    QMenu *m_contextMenu;
+    QAction *m_expandAction;
+    QAction *m_expandFirstLevelAction;
+    QAction *m_collapseAction;
+    QTreeWidgetItem *m_contextMenuItem;
 };
 
 #endif // MODELVIEWERTREEWIDGET_H
