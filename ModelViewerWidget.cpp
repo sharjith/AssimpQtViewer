@@ -626,7 +626,7 @@ GLuint ModelViewerWidget::loadTextureFromPath(const char* texturePath) {
 			glGenerateMipmap(GL_TEXTURE_2D);
 			glBindTexture(GL_TEXTURE_2D, 0); // Unbind
 
-			qDebug() << "Loaded texture:" << path;
+			//qDebug() << "Loaded texture:" << path;
 			return texId;
 		}
 	}
