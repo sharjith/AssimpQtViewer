@@ -656,7 +656,7 @@ void MainWindow::dropEvent(QDropEvent* event)
 		if (!urlList.isEmpty()) {
 			QString filePath = urlList.first().toLocalFile();
 			if (!filePath.isEmpty()) {
-				loadModel(filePath); 
+				openFile(filePath); 
 			}
 		}
 	}
