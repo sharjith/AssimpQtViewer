@@ -154,7 +154,7 @@ private:
 
     void sweepSelection(const QRect& rubberBandRect);
 
-    bool circleIntersectsRectangle(const QPointF& circleCenter, float circleRadius, const QRect& rect);
+    float computeOverlapArea(const QRect& rect1, const QRect& rect2);
 
     bool checkIfAnyMeshIsHidden() const;
 

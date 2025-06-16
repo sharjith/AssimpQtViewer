@@ -804,7 +804,7 @@ void ModelViewerWidget::mouseReleaseEvent(QMouseEvent *event)
 {
     setCursor(QCursor(Qt::ArrowCursor));
 
-    if (event->button() & Qt::LeftButton)
+    if (event->button() & Qt::LeftButton && event->modifiers() == Qt::NoModifier)
     {
         const int minRectangleSize = 5; // Minimum width and height in pixels
         if (m_scene && _rubberBand->width() >= minRectangleSize && _rubberBand->height() >= minRectangleSize)
@@ -1344,23 +1344,49 @@ void ModelViewerWidget::sweepSelection(const QRect& rubberBandRect)
 
             // Project center and radius to screen space
             QVector3D screenCenter = projMatrix * viewMatrix * QVector3D(center.x, center.y, center.z);
-            
+            if (screenCenter.z() <= 0)
+            {
+                continue; // Skip objects behind the camera
+            }
             screenCenter /= screenCenter.z(); // Perspective division
             screenCenter.setX(screenCenter.x() * viewport.width() / 2 + viewport.width() / 2);
             screenCenter.setY(-screenCenter.y() * viewport.height() / 2 + viewport.height() / 2);
 
             QVector3D radiusPoint = QVector3D(center.x, center.y, center.z) + QVector3D(radius, 0, 0); // Displace by radius
             QVector3D screenRadiusPoint = projMatrix * viewMatrix * radiusPoint;
+            if (screenRadiusPoint.z() <= 0)
+            {
+                continue; // Skip objects behind the camera
+            }
             screenRadiusPoint /= screenRadiusPoint.z(); // Perspective division
             screenRadiusPoint.setX(screenRadiusPoint.x() * viewport.width() / 2 + viewport.width() / 2);
             screenRadiusPoint.setY(-screenRadiusPoint.y() * viewport.height() / 2 + viewport.height() / 2);
 
             float screenRadius = (screenRadiusPoint - screenCenter).length();
 
-            // Check intersection with rubberBandRect
-            if (circleIntersectsRectangle(screenCenter.toPointF(), screenRadius, rubberBandRect))
+            // Approximate the circle as a QRect
+            QRect projectedBoundingRect(
+                QPoint(screenCenter.x() - screenRadius, screenCenter.y() - screenRadius),
+                QPoint(screenCenter.x() + screenRadius, screenCenter.y() + screenRadius)
+            );
+
+            // Refined intersection check
+            if (rubberBandRect.contains(projectedBoundingRect))
             {
+                // If the projected bounding rectangle is fully inside the rubberband rectangle
                 m_selectedMeshIndices.insert(meshIndex);
+            }
+            else if (rubberBandRect.intersects(projectedBoundingRect))
+            {
+                // If there's an intersection, check how much of the projected rectangle is inside
+                float overlapArea = computeOverlapArea(rubberBandRect, projectedBoundingRect);
+                float projectedArea = projectedBoundingRect.width() * projectedBoundingRect.height();
+
+                if ((overlapArea / projectedArea) > 0.5f)
+                {
+                    // Only select if at least 50% of the projected rectangle is inside
+                    m_selectedMeshIndices.insert(meshIndex);
+                }
             }
         }
 
@@ -1374,38 +1400,19 @@ void ModelViewerWidget::sweepSelection(const QRect& rubberBandRect)
     update();
 }
 
-bool ModelViewerWidget::circleIntersectsRectangle(const QPointF& circleCenter, float circleRadius, const QRect& rect)
+float ModelViewerWidget::computeOverlapArea(const QRect& rect1, const QRect& rect2)
 {
-    QPointF rectCenter = rect.center();
-    QPointF rectHalfExtents(rect.width() / 2, rect.height() / 2);
+    int x1 = std::max(rect1.left(), rect2.left());
+    int y1 = std::max(rect1.top(), rect2.top());
+    int x2 = std::min(rect1.right(), rect2.right());
+    int y2 = std::min(rect1.bottom(), rect2.bottom());
 
-    float dx = abs(circleCenter.x() - rectCenter.x());
-    float dy = abs(circleCenter.y() - rectCenter.y());
-
-    // Refine intersection logic to exclude partial overlaps
-    if (dx > rectHalfExtents.x() + circleRadius || dy > rectHalfExtents.y() + circleRadius)
+    if (x2 > x1 && y2 > y1)
     {
-        return false; // Circle is completely outside the rectangle
+        return (x2 - x1) * (y2 - y1); // Overlap area
     }
 
-    if (dx <= rectHalfExtents.x() - circleRadius && dy <= rectHalfExtents.y() - circleRadius)
-    {
-        return true; // Circle is fully inside the rectangle
-    }
-
-    // Check corner case
-   float cornerDistanceSq = (dx - rectHalfExtents.x()) * (dx - rectHalfExtents.x()) +
-        (dy - rectHalfExtents.y()) * (dy - rectHalfExtents.y());
-
-   if (cornerDistanceSq <= (circleRadius * circleRadius))
-   {
-       // Circle partially overlaps the rectangle
-       float overlapArea = 0.5f * M_PI * circleRadius * circleRadius;
-       float circleArea = M_PI * circleRadius * circleRadius;
-       return (overlapArea / circleArea) > 0.5f; // Significant overlap (>50%)
-   }
-
-   return false;
+    return 0.0f; // No overlap
 }
 
 aiNode *ModelViewerWidget::findNodeForMesh(aiNode *node, int meshIndex)
