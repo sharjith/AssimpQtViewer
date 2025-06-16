@@ -804,7 +804,8 @@ void ModelViewerWidget::mouseReleaseEvent(QMouseEvent *event)
 {
     setCursor(QCursor(Qt::ArrowCursor));
 
-    if (event->button() & Qt::LeftButton && event->modifiers() == Qt::NoModifier)
+    if (event->button() & Qt::LeftButton || 
+        (event->button() & Qt::LeftButton && event->modifiers() == Qt::ShiftModifier))
     {
         const int minRectangleSize = 5; // Minimum width and height in pixels
         if (m_scene && _rubberBand->width() >= minRectangleSize && _rubberBand->height() >= minRectangleSize)
@@ -926,6 +927,7 @@ void ModelViewerWidget::keyPressEvent(QKeyEvent *event)
             // Clear selection
             clearSelection();
             update();
+			emit selectionChanged(m_selectedMeshIndices);            
         }
         if (event->key() == Qt::Key_Space)
         {
@@ -1318,7 +1320,7 @@ void ModelViewerWidget::sweepSelection(const QRect& rubberBandRect)
     QMatrix4x4 viewMatrix = m_camera->getViewMatrix();
     QRect viewport(0, 0, width(), height()); // Screen space rectangle
 
-    m_selectedMeshIndices.clear();
+    //m_selectedMeshIndices.clear();
 
     std::function<void(aiNode*, const aiMatrix4x4&)> traverse;
     traverse = [&](aiNode* node, const aiMatrix4x4& parentTransform) {
