@@ -1320,49 +1320,79 @@ void ModelViewerWidget::sweepSelection(const QRect& rubberBandRect)
     QMatrix4x4 viewMatrix = m_camera->getViewMatrix();
     QRect viewport(0, 0, width(), height()); // Screen space rectangle
 
-    //m_selectedMeshIndices.clear();
+    // Determine if we're using perspective or orthographic projection
+    bool isPerspective = (projMatrix(3, 2) != 0.0f); // Check if w component is affected by z
 
     std::function<void(aiNode*, const aiMatrix4x4&)> traverse;
     traverse = [&](aiNode* node, const aiMatrix4x4& parentTransform) {
         aiMatrix4x4 transform = parentTransform * node->mTransformation;
-
         for (unsigned i = 0; i < node->mNumMeshes; ++i)
         {
             const int meshIndex = node->mMeshes[i];
             const aiMesh* mesh = m_scene->mMeshes[meshIndex];
-
             QVector3D cen;
             float radius;
             GLMesh* glMesh = m_meshIndexToGLMesh[meshIndex];
-
             if (!glMesh->isVisible())
             {
                 continue; // Skip invisible meshes
             }
-
             glMesh->getBoundingSphere(cen, radius);
             aiVector3D center(cen.x(), cen.y(), cen.z());
             center *= transform; // Apply transformation to center
 
-            // Project center and radius to screen space
-            QVector3D screenCenter = projMatrix * viewMatrix * QVector3D(center.x, center.y, center.z);
-            if (screenCenter.z() <= 0)
-            {
-                continue; // Skip objects behind the camera
-            }
-            screenCenter /= screenCenter.z(); // Perspective division
-            screenCenter.setX(screenCenter.x() * viewport.width() / 2 + viewport.width() / 2);
-            screenCenter.setY(-screenCenter.y() * viewport.height() / 2 + viewport.height() / 2);
+            // Project center to screen space
+            QVector4D worldCenter(center.x, center.y, center.z, 1.0f);
+            QVector4D clipCenter = projMatrix * viewMatrix * worldCenter;
 
-            QVector3D radiusPoint = QVector3D(center.x, center.y, center.z) + QVector3D(radius, 0, 0); // Displace by radius
-            QVector3D screenRadiusPoint = projMatrix * viewMatrix * radiusPoint;
-            if (screenRadiusPoint.z() <= 0)
+            // Skip objects behind the near plane (negative w for perspective, negative z for orthographic)
+            if (isPerspective)
             {
-                continue; // Skip objects behind the camera
+                if (clipCenter.w() <= 0) continue;
             }
-            screenRadiusPoint /= screenRadiusPoint.z(); // Perspective division
-            screenRadiusPoint.setX(screenRadiusPoint.x() * viewport.width() / 2 + viewport.width() / 2);
-            screenRadiusPoint.setY(-screenRadiusPoint.y() * viewport.height() / 2 + viewport.height() / 2);
+            else
+            {
+                if (clipCenter.z() <= -1.0f || clipCenter.z() >= 1.0f) continue; // Outside NDC z range
+            }
+
+            // Convert to NDC
+            QVector3D ndcCenter;
+            if (isPerspective)
+            {
+                ndcCenter = QVector3D(clipCenter.x() / clipCenter.w(),
+                    clipCenter.y() / clipCenter.w(),
+                    clipCenter.z() / clipCenter.w());
+            }
+            else
+            {
+                ndcCenter = QVector3D(clipCenter.x(), clipCenter.y(), clipCenter.z());
+            }
+
+            // Convert NDC to screen coordinates
+            QVector2D screenCenter;
+            screenCenter.setX(ndcCenter.x() * viewport.width() / 2 + viewport.width() / 2);
+            screenCenter.setY(-ndcCenter.y() * viewport.height() / 2 + viewport.height() / 2);
+
+            // Calculate screen space radius
+            QVector4D worldRadiusPoint(center.x + radius, center.y, center.z, 1.0f);
+            QVector4D clipRadiusPoint = projMatrix * viewMatrix * worldRadiusPoint;
+
+            QVector3D ndcRadiusPoint;
+            if (isPerspective)
+            {
+                if (clipRadiusPoint.w() <= 0) continue;
+                ndcRadiusPoint = QVector3D(clipRadiusPoint.x() / clipRadiusPoint.w(),
+                    clipRadiusPoint.y() / clipRadiusPoint.w(),
+                    clipRadiusPoint.z() / clipRadiusPoint.w());
+            }
+            else
+            {
+                ndcRadiusPoint = QVector3D(clipRadiusPoint.x(), clipRadiusPoint.y(), clipRadiusPoint.z());
+            }
+
+            QVector2D screenRadiusPoint;
+            screenRadiusPoint.setX(ndcRadiusPoint.x() * viewport.width() / 2 + viewport.width() / 2);
+            screenRadiusPoint.setY(-ndcRadiusPoint.y() * viewport.height() / 2 + viewport.height() / 2);
 
             float screenRadius = (screenRadiusPoint - screenCenter).length();
 
@@ -1383,7 +1413,6 @@ void ModelViewerWidget::sweepSelection(const QRect& rubberBandRect)
                 // If there's an intersection, check how much of the projected rectangle is inside
                 float overlapArea = computeOverlapArea(rubberBandRect, projectedBoundingRect);
                 float projectedArea = projectedBoundingRect.width() * projectedBoundingRect.height();
-
                 if ((overlapArea / projectedArea) > 0.5f)
                 {
                     // Only select if at least 50% of the projected rectangle is inside
@@ -1391,13 +1420,10 @@ void ModelViewerWidget::sweepSelection(const QRect& rubberBandRect)
                 }
             }
         }
-
         for (unsigned i = 0; i < node->mNumChildren; ++i)
             traverse(node->mChildren[i], transform);
         };
-
     traverse(m_scene->mRootNode, aiMatrix4x4());
-
     emit selectionChanged(m_selectedMeshIndices);
     update();
 }
