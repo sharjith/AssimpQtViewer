@@ -16,6 +16,7 @@
 #include <QTimer>
 #include <QToolButton>
 #include <QMenu>
+#include <QStyleFactory>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -97,6 +98,9 @@ ModelViewerWidget::ModelViewerWidget(QWidget *parent)
     setContextMenuPolicy(Qt::CustomContextMenu);
     connect(this, &QWidget::customContextMenuRequested,
             this, &ModelViewerWidget::showContextMenu);
+
+    _rubberBand = new QRubberBand(QRubberBand::Rectangle, this);
+    _rubberBand->setStyle(QStyleFactory::create("Fusion"));
 
     setFocusPolicy(Qt::StrongFocus);
 }
@@ -696,7 +700,7 @@ void ModelViewerWidget::mousePressEvent(QMouseEvent *event)
     if (m_inertiaTimer->isActive())
         m_inertiaTimer->stop();
 
-    m_lastMousePos = event->pos();
+    m_leftButtonPoint = m_lastMousePos = event->pos();
 
     if ((event->modifiers() & Qt::ControlModifier))
     {
@@ -716,11 +720,16 @@ void ModelViewerWidget::mousePressEvent(QMouseEvent *event)
         {
             m_multiSelectionEnabled = false;
         }
+        if (event->button() == Qt::LeftButton)
+        {
+            _rubberBand->setGeometry(QRect(m_lastMousePos, QSize()));
+            _rubberBand->show();
+        }
     }
 
     if (event->button() == Qt::LeftButton && m_mode == InteractionMode::Select && m_scene)
     {
-        pickAtScreenPosition(event->pos());
+        pickAtScreenPosition(event->pos());       
     }
 }
 
@@ -781,6 +790,10 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent *event)
 
         resizeGL(width(), height());
     }
+    else
+    {
+        _rubberBand->setGeometry(QRect(m_leftButtonPoint, event->pos()).normalized());
+    }
 
     m_lastMousePos = downPoint;
 
@@ -790,6 +803,16 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent *event)
 void ModelViewerWidget::mouseReleaseEvent(QMouseEvent *event)
 {
     setCursor(QCursor(Qt::ArrowCursor));
+
+    if (event->button() & Qt::LeftButton)
+    {
+        const int minRectangleSize = 5; // Minimum width and height in pixels
+        if (m_scene && _rubberBand->width() >= minRectangleSize && _rubberBand->height() >= minRectangleSize)
+        {
+            sweepSelection(_rubberBand->geometry());
+        }
+        _rubberBand->hide();
+    }
 
     m_isDragging = false;
 
@@ -1287,6 +1310,102 @@ bool ModelViewerWidget::rayIntersectsTriangle(
     }
 
     return false;
+}
+
+void ModelViewerWidget::sweepSelection(const QRect& rubberBandRect)
+{
+    QMatrix4x4 projMatrix = m_camera->getProjectionMatrix();
+    QMatrix4x4 viewMatrix = m_camera->getViewMatrix();
+    QRect viewport(0, 0, width(), height()); // Screen space rectangle
+
+    m_selectedMeshIndices.clear();
+
+    std::function<void(aiNode*, const aiMatrix4x4&)> traverse;
+    traverse = [&](aiNode* node, const aiMatrix4x4& parentTransform) {
+        aiMatrix4x4 transform = parentTransform * node->mTransformation;
+
+        for (unsigned i = 0; i < node->mNumMeshes; ++i)
+        {
+            const int meshIndex = node->mMeshes[i];
+            const aiMesh* mesh = m_scene->mMeshes[meshIndex];
+
+            QVector3D cen;
+            float radius;
+            GLMesh* glMesh = m_meshIndexToGLMesh[meshIndex];
+
+            if (!glMesh->isVisible())
+            {
+                continue; // Skip invisible meshes
+            }
+
+            glMesh->getBoundingSphere(cen, radius);
+            aiVector3D center(cen.x(), cen.y(), cen.z());
+            center *= transform; // Apply transformation to center
+
+            // Project center and radius to screen space
+            QVector3D screenCenter = projMatrix * viewMatrix * QVector3D(center.x, center.y, center.z);
+            
+            screenCenter /= screenCenter.z(); // Perspective division
+            screenCenter.setX(screenCenter.x() * viewport.width() / 2 + viewport.width() / 2);
+            screenCenter.setY(-screenCenter.y() * viewport.height() / 2 + viewport.height() / 2);
+
+            QVector3D radiusPoint = QVector3D(center.x, center.y, center.z) + QVector3D(radius, 0, 0); // Displace by radius
+            QVector3D screenRadiusPoint = projMatrix * viewMatrix * radiusPoint;
+            screenRadiusPoint /= screenRadiusPoint.z(); // Perspective division
+            screenRadiusPoint.setX(screenRadiusPoint.x() * viewport.width() / 2 + viewport.width() / 2);
+            screenRadiusPoint.setY(-screenRadiusPoint.y() * viewport.height() / 2 + viewport.height() / 2);
+
+            float screenRadius = (screenRadiusPoint - screenCenter).length();
+
+            // Check intersection with rubberBandRect
+            if (circleIntersectsRectangle(screenCenter.toPointF(), screenRadius, rubberBandRect))
+            {
+                m_selectedMeshIndices.insert(meshIndex);
+            }
+        }
+
+        for (unsigned i = 0; i < node->mNumChildren; ++i)
+            traverse(node->mChildren[i], transform);
+        };
+
+    traverse(m_scene->mRootNode, aiMatrix4x4());
+
+    emit selectionChanged(m_selectedMeshIndices);
+    update();
+}
+
+bool ModelViewerWidget::circleIntersectsRectangle(const QPointF& circleCenter, float circleRadius, const QRect& rect)
+{
+    QPointF rectCenter = rect.center();
+    QPointF rectHalfExtents(rect.width() / 2, rect.height() / 2);
+
+    float dx = abs(circleCenter.x() - rectCenter.x());
+    float dy = abs(circleCenter.y() - rectCenter.y());
+
+    // Refine intersection logic to exclude partial overlaps
+    if (dx > rectHalfExtents.x() + circleRadius || dy > rectHalfExtents.y() + circleRadius)
+    {
+        return false; // Circle is completely outside the rectangle
+    }
+
+    if (dx <= rectHalfExtents.x() - circleRadius && dy <= rectHalfExtents.y() - circleRadius)
+    {
+        return true; // Circle is fully inside the rectangle
+    }
+
+    // Check corner case
+   float cornerDistanceSq = (dx - rectHalfExtents.x()) * (dx - rectHalfExtents.x()) +
+        (dy - rectHalfExtents.y()) * (dy - rectHalfExtents.y());
+
+   if (cornerDistanceSq <= (circleRadius * circleRadius))
+   {
+       // Circle partially overlaps the rectangle
+       float overlapArea = 0.5f * M_PI * circleRadius * circleRadius;
+       float circleArea = M_PI * circleRadius * circleRadius;
+       return (overlapArea / circleArea) > 0.5f; // Significant overlap (>50%)
+   }
+
+   return false;
 }
 
 aiNode *ModelViewerWidget::findNodeForMesh(aiNode *node, int meshIndex)

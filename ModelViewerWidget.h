@@ -9,6 +9,7 @@
 #include <QString>
 #include <QToolButton>
 #include <QMatrix4x4>
+#include <QRubberBand>
 #include "GLMesh.h"
 #include "Trihedron.h"
 #include "ShaderProgram.h"
@@ -151,6 +152,10 @@ private:
         float &outT
     );
 
+    void sweepSelection(const QRect& rubberBandRect);
+
+    bool circleIntersectsRectangle(const QPointF& circleCenter, float circleRadius, const QRect& rect);
+
     bool checkIfAnyMeshIsHidden() const;
 
     QVector3D get3dTranslationVectorFromMousePoints(const QPoint &start, const QPoint &end);
@@ -175,9 +180,11 @@ private:
     // Interaction modes
     enum class InteractionMode { Select, Zoom, Rotate, Pan };
 
+    QPoint m_leftButtonPoint;
     QPoint m_lastMousePos;
     QPoint m_totalMouseDelta;
     InteractionMode m_mode = InteractionMode::Select;
+    QRubberBand* _rubberBand;
 
     ViewProjection m_viewProjection = ViewProjection::Custom;
 
