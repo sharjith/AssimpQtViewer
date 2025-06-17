@@ -792,7 +792,8 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent *event)
     }
     else
     {
-        _rubberBand->setGeometry(QRect(m_leftButtonPoint, event->pos()).normalized());
+        if(event->modifiers() != Qt::ControlModifier)
+            _rubberBand->setGeometry(QRect(m_leftButtonPoint, event->pos()).normalized());
     }
 
     m_lastMousePos = downPoint;
@@ -807,7 +808,7 @@ void ModelViewerWidget::mouseReleaseEvent(QMouseEvent *event)
     if (event->button() & Qt::LeftButton || 
         (event->button() & Qt::LeftButton && event->modifiers() == Qt::ShiftModifier))
     {
-        const int minRectangleSize = 5; // Minimum width and height in pixels
+        const int minRectangleSize = 50; // Minimum width and height in pixels
         if (m_scene && _rubberBand->width() >= minRectangleSize && _rubberBand->height() >= minRectangleSize)
         {
             sweepSelection(_rubberBand->geometry());
