@@ -1,7 +1,8 @@
-#define NOMINMAX
+﻿#define NOMINMAX
 
 #include "ModelViewerWidget.h"
 #include "GLCamera.h"
+#include "FlyOutViewButton.h"
 #include <assimp/postprocess.h>
 #include <cfloat>
 #include <QApplication>
@@ -17,6 +18,7 @@
 #include <QToolButton>
 #include <QMenu>
 #include <QStyleFactory>
+
 
 #ifdef _WIN32
 #include <windows.h>
@@ -70,8 +72,49 @@ ModelViewerWidget::ModelViewerWidget(QWidget *parent)
     layout->addWidget(createViewButton(":/icons/res/back.png", "Rear View", [this]() { setViewRear(); }, _viewToolbar));
     layout->addWidget(createViewButton(":/icons/res/right.png", "Right View", [this]() { setViewRight(); },
                                        _viewToolbar));
-    layout->addWidget(createViewButton(":/icons/res/isometric.png", "Isometric View",
-                                       [this]() { setViewAxonometric(); }, _viewToolbar));
+   
+	m_toolButtonIsometricView = new FlyOutViewButton(_viewToolbar);
+	m_toolButtonIsometricView->setObjectName(QString::fromUtf8("toolButtonIsometricView"));
+	m_toolButtonIsometricView->setToolTip("Axonometric View");
+	m_toolButtonIsometricView->setIcon(QIcon(":/icons/res/isometric.png"));
+    m_toolButtonIsometricView->setPopupMode(QToolButton::DelayedPopup);
+    m_toolButtonIsometricView->setIconSize(QSize(64, 64));   
+    m_toolButtonIsometricView->setAutoRaise(true); // Flat appearance
+    
+   
+	layout->addWidget(m_toolButtonIsometricView);
+    disconnect(m_toolButtonIsometricView, SIGNAL(clicked()), 0, 0);
+
+    m_isometricView = new QAction(QIcon(":/icons/res/isometric.png"), "Isometric", this);
+    m_isometricView->setObjectName(QString::fromUtf8("isometricView"));
+    m_isometricView->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_1));
+	connect(m_isometricView, &QAction::triggered, this, &ModelViewerWidget::onActionIsometricViewTriggered);
+
+    m_dimetricView = new QAction(QIcon(":/icons/res/dimetric.png"), "Dimetric", this);
+    m_dimetricView->setObjectName(QString::fromUtf8("dimetricView"));
+    m_dimetricView->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_2));
+	connect(m_dimetricView, &QAction::triggered, this, &ModelViewerWidget::onActionDimetricViewTriggered);
+
+    m_trimetricView = new QAction(QIcon(":/icons/res/trimetric.png"), "Trimetric", this);
+    m_trimetricView->setObjectName(QString::fromUtf8("trimetricView"));
+    m_trimetricView->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_3));
+	connect(m_trimetricView, &QAction::triggered, this, &ModelViewerWidget::onActionTrimetricViewTriggered);
+
+    // View
+    QMenu* axoMenu = new QMenu;
+    axoMenu->addAction(m_isometricView);
+    axoMenu->addAction(m_dimetricView);
+    axoMenu->addAction(m_trimetricView);
+    // add action to widget as well
+    addAction(m_isometricView);
+    addAction(m_dimetricView);
+    addAction(m_trimetricView);
+
+    m_toolButtonIsometricView->setMenu(axoMenu);
+    m_toolButtonIsometricView->setDefaultAction(m_isometricView);
+    QObject::connect(m_toolButtonIsometricView, SIGNAL(triggered(QAction*)),
+        m_toolButtonIsometricView, SLOT(setDefaultAction(QAction*)));
+
     layout->addWidget(createViewButton(":/icons/res/fit-all.png", "Fit All", [this]() { fitToView(); }, _viewToolbar));
 
     QToolButton *projToggleButton = new QToolButton(_viewToolbar);
@@ -1082,6 +1125,63 @@ void ModelViewerWidget::setViewAxonometric()
 {
     m_camera->setView(GLCamera::ViewProjection::SE_ISOMETRIC_VIEW);
     update();
+}
+
+void ModelViewerWidget::setViewDimetric()
+{
+    m_camera->setView(GLCamera::ViewProjection::DIMETRIC_VIEW);
+    update();
+}
+
+void ModelViewerWidget::setViewTrimetric()
+{
+    m_camera->setView(GLCamera::ViewProjection::TRIMETRIC_VIEW);
+    update();
+}
+
+void ModelViewerWidget::onActionIsometricViewTriggered(bool /*checked*/)
+{
+    /*buttonGroupViews->setExclusive(false);
+    QList<QAbstractButton*> buttons = buttonGroupViews->buttons();
+    for (auto b : buttons)
+    {
+        b->setChecked(false);
+    }
+    buttonGroupViews->setExclusive(true);*/
+
+    setViewAxonometric();
+
+    m_toolButtonIsometricView->setDefaultAction(dynamic_cast<QAction*>(sender()));
+}
+
+void ModelViewerWidget::onActionDimetricViewTriggered(bool /*checked*/)
+{
+    /*buttonGroupViews->setExclusive(false);
+    QList<QAbstractButton*> buttons = buttonGroupViews->buttons();
+    for (auto b : buttons)
+    {
+        b->setChecked(false);
+    }
+    buttonGroupViews->setExclusive(true);*/
+
+	setViewDimetric();   
+
+    m_toolButtonIsometricView->setDefaultAction(dynamic_cast<QAction*>(sender()));
+}
+
+void ModelViewerWidget::onActionTrimetricViewTriggered(bool /*checked*/)
+{
+    /*buttonGroupViews->setExclusive(false);
+    QList<QAbstractButton*> buttons = buttonGroupViews->buttons();
+    for (auto b : buttons)
+    {
+        b->setChecked(false);
+    }
+    buttonGroupViews->setExclusive(true);*/
+
+    setViewTrimetric();	
+
+    m_toolButtonIsometricView->setDefaultAction(dynamic_cast<QAction*>(sender()));
 }
 
 

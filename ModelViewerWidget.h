@@ -14,6 +14,7 @@
 #include "Trihedron.h"
 #include "ShaderProgram.h"
 
+class FlyOutViewButton;
 class GLCamera;
 
 enum class ViewProjection
@@ -107,6 +108,10 @@ private slots:
 
     void showAllMeshes();
 
+    void onActionIsometricViewTriggered(bool checked);
+    void onActionDimetricViewTriggered(bool checked);
+    void onActionTrimetricViewTriggered(bool checked);
+
 private:
     void setupContextMenu();
 
@@ -151,6 +156,10 @@ private:
 
     void setViewAxonometric();
 
+	void setViewDimetric();
+
+	void setViewTrimetric();
+
     void fitToView();
 
     void pickAtScreenPosition(const QPoint &pos);
@@ -177,6 +186,12 @@ private:
                                   const std::function<void()> &callback, QWidget *parent = nullptr);
 
 private:
+
+    FlyOutViewButton* m_toolButtonIsometricView;
+    QAction* m_isometricView;
+    QAction* m_dimetricView;
+    QAction* m_trimetricView;
+
     const aiScene *m_scene = nullptr;
     Assimp::Importer m_importer;
 
