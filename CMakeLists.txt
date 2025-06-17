@@ -19,34 +19,28 @@ find_package(Qt6 REQUIRED COMPONENTS Core Gui OpenGLWidgets Widgets OpenGL Concu
 find_package(OpenGL REQUIRED)
 find_package(assimp REQUIRED)
 
-# Source files
-set(SOURCES
-    main.cpp
-	MainWindow.cpp
-    ModelViewerWidget.cpp    
-    ModelViewerTreeWidget.cpp
-    HighlightDelegate.cpp    
-    GLCamera.cpp
-    GLMesh.cpp
-    ShaderProgram.cpp
-    Trihedron.cpp
-    Resource.qrc
-)
-
-set(HEADERS
-	MainWindow.h
-    ModelViewerWidget.h    
-    ModelViewerTreeWidget.h
-    HighlightDelegate.h
-    GLCamera.h
-    GLMesh.h
-    ShaderProgram.h
-    Trihedron.h
-    AssimpProgressHandler.h
-)
-
 # Main executable
-add_executable(AssimpQtViewer ${SOURCES} ${HEADERS})
+add_executable(AssimpQtViewer)
+
+
+file(GLOB sources *.cpp *.cxx *.h *.hxx)
+file(GLOB ui_sources *.ui)
+
+qt_wrap_ui(ui_wrapped ${ui_sources})
+qt_add_resources(resources Resource.qrc)
+
+target_sources(AssimpQtViewer
+    PRIVATE
+        ${sources}
+        ${ui_wrapped}
+        ${resources}
+)
+
+target_include_directories(AssimpQtViewer
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_BINARY_DIR}      
+)
 
 if(WIN32)
     target_sources(AssimpQtViewer

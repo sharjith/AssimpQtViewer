@@ -114,6 +114,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(exitAct, &QAction::triggered, this, &QWidget::close);
 
     QMenu *settingsMenu = menuBar()->addMenu("Settings");
+	QAction* setBackgroundColor = new QAction("Set Background Color", this);
+    connect(setBackgroundColor, &QAction::triggered, m_viewerWidget, &ModelViewerWidget::setBackgroundColor);
+    settingsMenu->addAction(setBackgroundColor);
+	settingsMenu->addSeparator();
     QAction *resetOpenBehavior = new QAction("Reset Open File Behavior", this);
     connect(resetOpenBehavior, &QAction::triggered, this, [this]() {
         QSettings().setValue("openModelBehavior", "Ask");

@@ -39,8 +39,7 @@ ModelViewerWidget::ModelViewerWidget(QWidget *parent)
     fmt.setOption(QSurfaceFormat::DebugContext);
     QSurfaceFormat::setDefaultFormat(fmt);
 
-    m_bgTopColor = QColor::fromRgbF(0.45f, 0.45f, 0.45f, 1.0f);
-    m_bgBotColor = QColor::fromRgbF(0.9f, 0.9f, 0.9f, 1.0f);
+    loadBgColorSettings();
 
     m_modelMatrix.setToIdentity();
     m_viewMatrix.setToIdentity();
@@ -122,6 +121,14 @@ QToolButton *ModelViewerWidget::createViewButton(const QString &iconPath, const 
     return button;
 }
 
+#include "BackgroundColor.h"
+#include <QSettings>
+void ModelViewerWidget::setBackgroundColor()
+{
+    BackgroundColor bgCol(this);
+    bgCol.exec();
+}
+
 void ModelViewerWidget::initializeGL()
 {
     initializeOpenGLFunctions();
@@ -188,7 +195,7 @@ void ModelViewerWidget::paintGL()
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     drawGradientBackground(m_bgTopColor.redF(), m_bgTopColor.greenF(), m_bgTopColor.blueF(), m_bgTopColor.alphaF(),
-        m_bgBotColor.redF(), m_bgBotColor.greenF(), m_bgBotColor.blueF(), m_bgBotColor.alphaF(), _gradientStyle);
+        m_bgBotColor.redF(), m_bgBotColor.greenF(), m_bgBotColor.blueF(), m_bgBotColor.alphaF(), m_gradientStyle);
 
     glEnable(GL_DEPTH_TEST);
     m_viewMatrix = m_camera->getViewMatrix();
@@ -386,6 +393,53 @@ void ModelViewerWidget::drawGradientBackground(float top_r, float top_g, float t
     glDrawArrays(GL_TRIANGLES, 0, 3);
 
     glEnable(GL_DEPTH_TEST);
+}
+
+void ModelViewerWidget::loadBgColorSettings()
+{
+    QSettings settings(QCoreApplication::organizationName(), QCoreApplication::applicationName());
+
+    // Retrieve and validate top color
+    QVariant topColorValue = settings.value("Background/TopColor");
+    if (topColorValue.isValid() && topColorValue.canConvert<QColor>())
+    {
+        m_bgTopColor = topColorValue.value<QColor>();
+    }
+    else
+    {
+        m_bgTopColor = QColor::fromRgbF(0.45f, 0.45f, 0.45f, 1.0f);
+    }
+
+    // Retrieve and validate bottom color
+    QVariant bottomColorValue = settings.value("Background/BottomColor");
+    if (bottomColorValue.isValid() && bottomColorValue.canConvert<QColor>())
+    {
+        m_bgBotColor = bottomColorValue.value<QColor>();
+    }
+    else
+    {
+        m_bgBotColor = QColor::fromRgbF(0.9f, 0.9f, 0.9f, 1.0f);
+
+    }
+
+    // Retrieve and validate gradient style
+    QVariant gradientStyleValue = settings.value("Background/GradientStyle");
+    if (gradientStyleValue.isValid() && gradientStyleValue.canConvert<int>())
+    {
+        int style = gradientStyleValue.toInt();
+        if (style >= 0 && style <= 3)
+        {
+            m_gradientStyle = style;
+        }
+        else
+        {
+            m_gradientStyle = 0; // Default to vertical gradient
+        }
+    }
+    else
+    {
+        m_gradientStyle = 0; // Default to vertical gradient
+    }
 }
 
 void ModelViewerWidget::drawTrihedronOverlay()

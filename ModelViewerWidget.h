@@ -50,6 +50,16 @@ public:
 
     void clearSelection();
 
+    void setBgTopColor(const QColor& color) { m_bgTopColor = color; update(); }
+	QColor getBgTopColor() const { return m_bgTopColor; }
+    void setBgBotColor(const QColor& color) { m_bgBotColor = color; update(); }
+	QColor getBgBotColor() const { return m_bgBotColor; }
+    void setBgGradientStyle(int style) { m_gradientStyle = style; update(); }
+	int getBgGradientStyle() const { return m_gradientStyle; }
+
+public slots:
+	void setBackgroundColor();
+
 protected:
     void initializeGL() override;
 
@@ -116,6 +126,8 @@ private:
         
     void drawGradientBackground(float top_r, float top_g, float top_b, float top_a,
         float bot_r, float bot_g, float bot_b, float bot_a, int gradientStyle);
+
+    void loadBgColorSettings();
 
     void drawTrihedronOverlay();
 
@@ -232,7 +244,7 @@ private:
     QOpenGLVertexArrayObject m_bgVAO;
     QColor      m_bgTopColor;
     QColor      m_bgBotColor;
-    int _gradientStyle = 0; // 0=Vertical, 1=Horizontal, 2=TopLeftToBottomRight, 3=TopRightToBottomLeft
+    int m_gradientStyle = 0; // 0=Vertical, 1=Horizontal, 2=TopLeftToBottomRight, 3=TopRightToBottomLeft
 
     std::unique_ptr<Trihedron> m_trihedron; // Trihedron for orientation reference    
     std::unique_ptr<ShaderProgram> m_trihedronShader; // Shader for overlay elements like trihedron
