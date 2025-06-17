@@ -25,7 +25,7 @@ public:
     void draw(const QMatrix4x4 &viewMatrix, const QMatrix4x4 &projectionMatrix);
 
 private:
-    ShaderProgram *m_shader;
+    ShaderProgram* m_shader;
     GLuint m_cylinderVAO, m_coneVAO, m_sphereVAO;
     GLuint m_sphereVBO;
     GLuint m_sphereEBO;

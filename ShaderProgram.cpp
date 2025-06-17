@@ -11,68 +11,50 @@ ShaderProgram::~ShaderProgram()
 {
 }
 
-bool ShaderProgram::load(const QString &vertexPath, const QString &fragmentPath)
+bool ShaderProgram::loadCompileAndLinkShaderFromFile(const QString& vertexProg, const QString& fragmentProg, const QString& geometryProg, const QString& tessControlProg, const QString& tessEvalProg)
 {
-    if (!m_program.addShaderFromSourceFile(QOpenGLShader::Vertex, vertexPath))
-    {
-        qDebug() << "Vertex shader error:" << m_program.log();
-        return false;
-    }
-    if (!m_program.addShaderFromSourceFile(QOpenGLShader::Fragment, fragmentPath))
-    {
-        qDebug() << "Fragment shader error:" << m_program.log();
-        return false;
-    }
-    if (!m_program.link())
-    {
-        qDebug() << "Shader link error:" << m_program.log();
-        return false;
-    }
-    return true;
-}
+	bool success = addShaderFromSourceFile(QOpenGLShader::Vertex, vertexProg);
+	if (!success)
+	{
+		qDebug() << "Error in vertex shader:" << objectName() << log();
+	}
+	if (tessControlProg != "")
+	{
+		success = addShaderFromSourceFile(QOpenGLShader::TessellationControl, tessControlProg);
+		if (!success)
+		{
+			qDebug() << "Error in tessellation  control shader:" << objectName() << log();
+		}
+	}
+	if (tessEvalProg != "")
+	{
+		success = addShaderFromSourceFile(QOpenGLShader::TessellationEvaluation, tessEvalProg);
+		if (!success)
+		{
+			qDebug() << "Error in tessellation  evaluation shader:" << objectName() << log();
+		}
+	}
+	if (geometryProg != "")
+	{
+		success = addShaderFromSourceFile(QOpenGLShader::Geometry, geometryProg);
+		if (!success)
+		{
+			qDebug() << "Error in geometry shader:" << objectName() << log();
+		}
+	}
+	success = addShaderFromSourceFile(QOpenGLShader::Fragment, fragmentProg);
+	if (!success)
+	{
+		qDebug() << "Error in fragment shader:" << objectName() << log();
+	}
+	if (success)
+	{
+		success = link();
+		if (!success)
+		{
+			qDebug() << "Error linking shader program:" << objectName() << log();
+		}
+	}
 
-void ShaderProgram::use()
-{
-    m_program.bind();
-}
-
-void ShaderProgram::release()
-{
-    m_program.release();
-}
-
-void ShaderProgram::setUniform(const QString &name, const QMatrix4x4 &value)
-{
-    m_program.setUniformValue(name.toUtf8().data(), value);
-}
-
-void ShaderProgram::setUniform(const QString &name, const QVector3D &value)
-{
-    m_program.setUniformValue(name.toUtf8().data(), value);
-}
-
-void ShaderProgram::setUniform(const QString &name, const QVector4D &value)
-{
-    m_program.setUniformValue(name.toUtf8().data(), value);
-}
-
-void ShaderProgram::setUniform(const QString &name, float value)
-{
-    m_program.setUniformValue(name.toUtf8().data(), value);
-}
-
-void ShaderProgram::setUniform(const QString &name, int value)
-{
-    m_program.setUniformValue(name.toUtf8().data(), value);
-}
-
-void ShaderProgram::setUniform(const QString &name, bool value)
-{
-    m_program.setUniformValue(name.toUtf8().data(), value);
-}
-
-
-QOpenGLShaderProgram *ShaderProgram::program()
-{
-    return &m_program;
+	return success;
 }

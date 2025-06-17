@@ -225,9 +225,9 @@ private:
     QAction *m_showAllAction = nullptr;
     QAction *m_separatorAction = nullptr;
 
-    ShaderProgram m_shader;
-    ShaderProgram m_backgroundShader; // Shader for background gradient
+    std::unique_ptr<ShaderProgram> m_shader;
+    std::unique_ptr<ShaderProgram> m_backgroundShader; // Shader for background gradient
 
     std::unique_ptr<Trihedron> m_trihedron; // Trihedron for orientation reference    
-    ShaderProgram m_trihedronShader; // Shader for overlay elements like trihedron
+    std::unique_ptr<ShaderProgram> m_trihedronShader; // Shader for overlay elements like trihedron
 };

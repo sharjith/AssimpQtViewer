@@ -3,33 +3,15 @@
 #include <QOpenGLShaderProgram>
 #include <QString>
 
-class ShaderProgram
+class ShaderProgram : public QOpenGLShaderProgram
 {
 public:
     ShaderProgram();
 
     ~ShaderProgram();
 
-    bool load(const QString &vertexPath, const QString &fragmentPath);
+    bool loadCompileAndLinkShaderFromFile(const QString& vertexProg,
+        const QString& fragmentProg, const QString& geometryProg = "",
+        const QString& tessControlProg = "", const QString& tessEvalProg = "");
 
-    void use();
-
-    void release();
-
-    void setUniform(const QString &name, const QMatrix4x4 &value);
-
-    void setUniform(const QString &name, const QVector3D &value);
-
-    void setUniform(const QString &name, const QVector4D &value);
-
-    void setUniform(const QString &name, float value);
-
-    void setUniform(const QString &name, int value);
-
-    void setUniform(const QString &name, bool value);
-
-    QOpenGLShaderProgram *program();
-
-private:
-    QOpenGLShaderProgram m_program;
 };

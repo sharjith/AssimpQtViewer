@@ -28,7 +28,9 @@
 
 
 ModelViewerWidget::ModelViewerWidget(QWidget *parent)
-    : QOpenGLWidget(parent)
+    : QOpenGLWidget(parent), m_shader(nullptr), m_backgroundShader(nullptr),
+      m_trihedronShader(nullptr), m_camera(nullptr), m_scene(nullptr), m_inertiaActive(false),
+	m_isDragging(false), m_mode(InteractionMode::Select), m_multiSelectionEnabled(false)
 {
     QSurfaceFormat fmt;
     fmt.setDepthBufferSize(24);
@@ -138,17 +140,20 @@ void ModelViewerWidget::initializeGL()
     }
 
 
-    // Load shader sources (for demo, you can hardcode or load from file)
-    m_shader.load(":/shaders/shaders/mesh.vert",
+    // Load shader sources
+	m_shader = std::make_unique<ShaderProgram>();
+    m_shader->loadCompileAndLinkShaderFromFile(":/shaders/shaders/mesh.vert",
                   ":/shaders/shaders/mesh.frag");
 
-    m_backgroundShader.load(":/shaders/shaders/gradientbg.vert",
+    m_backgroundShader = std::make_unique<ShaderProgram>();
+    m_backgroundShader->loadCompileAndLinkShaderFromFile(":/shaders/shaders/gradientbg.vert",
                             ":/shaders/shaders/gradientbg.frag");
 
-    m_trihedronShader.load(":/shaders/shaders/trihedron.vert",
+    m_trihedronShader = std::make_unique<ShaderProgram>();
+    m_trihedronShader->loadCompileAndLinkShaderFromFile(":/shaders/shaders/trihedron.vert",
                            ":/shaders/shaders/trihedron.frag");
 
-    m_trihedron = std::make_unique<Trihedron>(&m_trihedronShader);
+    m_trihedron = std::make_unique<Trihedron>(m_trihedronShader.get());
 }
 
 void ModelViewerWidget::resizeGL(int w, int h)
@@ -188,7 +193,7 @@ void ModelViewerWidget::paintGL()
 
     if (!m_glMeshes.empty())
     {
-        m_shader.use();
+        m_shader->bind();
 
         QVector3D lightColor(1.0f, 1.0f, 1.0f);
         QVector3D lightPos(0.0f, 0.0f, 1.0f);
@@ -201,14 +206,14 @@ void ModelViewerWidget::paintGL()
 
         QVector3D viewDir = cameraTarget - cameraPos;
         viewDir.normalize();
-        m_shader.setUniform("lightDir", lightDirWorld);
-        m_shader.setUniform("viewPos", cameraPos);
-        m_shader.setUniform("lightPos", lightPos);
-        m_shader.setUniform("ambientColor", ambient);
-        m_shader.setUniform("shininess", shininess);
+        m_shader->setUniformValue("lightDir", lightDirWorld);
+        m_shader->setUniformValue("viewPos", cameraPos);
+        m_shader->setUniformValue("lightPos", lightPos);
+        m_shader->setUniformValue("ambientColor", ambient);
+        m_shader->setUniformValue("shininess", shininess);
 
-        m_shader.setUniform("mvp", m_projectionMatrix * m_viewMatrix);
-        m_shader.setUniform("view", m_viewMatrix);
+        m_shader->setUniformValue("mvp", m_projectionMatrix * m_viewMatrix);
+        m_shader->setUniformValue("view", m_viewMatrix);
 
         for (const auto &meshptr: m_glMeshes)
         {
@@ -221,8 +226,8 @@ void ModelViewerWidget::paintGL()
             }
 
 
-            m_shader.setUniform("specularColor", mesh->material().specular);
-            m_shader.setUniform("model", mesh->modelMatrix());
+            m_shader->setUniformValue("specularColor", mesh->material().specular);
+            m_shader->setUniformValue("model", mesh->modelMatrix());
 
             // Check if this mesh should be highlighted
             // Fast lookup using reverse mapping
@@ -239,11 +244,11 @@ void ModelViewerWidget::paintGL()
             {
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                m_shader.setUniform("isSelected", true);
+                m_shader->setUniformValue("isSelected", true);
             } else
             {
                 glDisable(GL_BLEND);
-                m_shader.setUniform("isSelected", false);
+                m_shader->setUniformValue("isSelected", false);
             }
 
             if (mesh->hasAnyOpacity())
@@ -398,7 +403,7 @@ void ModelViewerWidget::drawGradientBackground()
     glEnableVertexAttribArray(1);
 
     // Use your custom shader program
-    m_backgroundShader.use(); // Assumes you have a Shader class that handles compiling/linking shaders
+    m_backgroundShader->bind(); // Assumes you have a Shader class that handles compiling/linking shaders
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
 
@@ -516,7 +521,7 @@ void ModelViewerWidget::loadNodeMeshes(aiNode *node)
         computeBoundingSphere(mesh, node->mTransformation, oCenter, oRadius);
 
         //GLMesh* glMesh = new GLMesh(mesh, m_shader.program());
-        auto glMesh = std::make_unique<GLMesh>(mesh, m_shader.program());
+        auto glMesh = std::make_unique<GLMesh>(mesh, m_shader.get());
 
         glMesh->setBoundingSphere(QVector3D(oCenter.x, oCenter.y, oCenter.z), oRadius);
 

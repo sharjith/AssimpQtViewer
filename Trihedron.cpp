@@ -315,7 +315,7 @@ void Trihedron::generateSphereGeometry()
 
 void Trihedron::drawCylinder(const QMatrix4x4 &modelMatrix)
 {
-    m_shader->setUniform("uModel", modelMatrix);
+    m_shader->setUniformValue("uModel", modelMatrix);
     glBindVertexArray(m_cylinderVAO);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, m_cylinderVertexCount);
     glBindVertexArray(0);
@@ -323,7 +323,7 @@ void Trihedron::drawCylinder(const QMatrix4x4 &modelMatrix)
 
 void Trihedron::drawCone(const QMatrix4x4 &modelMatrix)
 {
-    m_shader->setUniform("uModel", modelMatrix);
+    m_shader->setUniformValue("uModel", modelMatrix);
     glBindVertexArray(m_coneVAO);
     glDrawArrays(GL_TRIANGLE_FAN, 0, m_coneVertexCount);
     glBindVertexArray(0);
@@ -331,7 +331,7 @@ void Trihedron::drawCone(const QMatrix4x4 &modelMatrix)
 
 void Trihedron::drawSphere(const QMatrix4x4 &modelMatrix)
 {
-    m_shader->setUniform("uModel", modelMatrix);
+    m_shader->setUniformValue("uModel", modelMatrix);
     glBindVertexArray(m_sphereVAO);
     glDrawElements(GL_TRIANGLES, m_sphereIndexCount, GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
@@ -339,23 +339,23 @@ void Trihedron::drawSphere(const QMatrix4x4 &modelMatrix)
 
 void Trihedron::draw(const QMatrix4x4 &viewMatrix, const QMatrix4x4 &projectionMatrix)
 {
-    m_shader->use();
+    m_shader->bind();
 
     // Set view and projection matrices
-    m_shader->setUniform("uView", viewMatrix);
-    m_shader->setUniform("uProjection", projectionMatrix);
+    m_shader->setUniformValue("uView", viewMatrix);
+    m_shader->setUniformValue("uProjection", projectionMatrix);
 
     QMatrix4x4 model;
 
     // Draw center sphere
     model.setToIdentity();
-    m_shader->setUniform("uColor", QVector3D(1.0f, 1.0f, 1.0f)); // White color
+    m_shader->setUniformValue("uColor", QVector3D(1.0f, 1.0f, 1.0f)); // White color
     drawSphere(model);
 
     // Draw X-axis (Red)
     model.setToIdentity();
     model.rotate(90, 0, 1, 0); // Rotate to align with X-axis
-    m_shader->setUniform("uColor", QVector3D(1.0f, 0.0f, 0.0f)); // Red color
+    m_shader->setUniformValue("uColor", QVector3D(1.0f, 0.0f, 0.0f)); // Red color
     drawCylinder(model);
 
     model.setToIdentity();
@@ -366,7 +366,7 @@ void Trihedron::draw(const QMatrix4x4 &viewMatrix, const QMatrix4x4 &projectionM
     // Draw Y-axis (Green)
     model.setToIdentity();
     model.rotate(-90, 1, 0, 0); // Rotate to align with Y-axis
-    m_shader->setUniform("uColor", QVector3D(0.0f, 0.75f, 0.0f)); // Green color
+    m_shader->setUniformValue("uColor", QVector3D(0.0f, 0.75f, 0.0f)); // Green color
     drawCylinder(model);
 
     model.setToIdentity();
@@ -376,7 +376,7 @@ void Trihedron::draw(const QMatrix4x4 &viewMatrix, const QMatrix4x4 &projectionM
 
     // Draw Z-axis (Blue)
     model.setToIdentity();
-    m_shader->setUniform("uColor", QVector3D(0.0f, 0.0f, 1.0f)); // Blue color
+    m_shader->setUniformValue("uColor", QVector3D(0.0f, 0.0f, 1.0f)); // Blue color
     drawCylinder(model);
 
     model.setToIdentity();
