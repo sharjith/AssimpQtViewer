@@ -1,4 +1,5 @@
-#version 330 core
+#version 450 core
+
 in vec3 fragNormal;
 in vec3 fragPos;
 in vec4 vColor;

@@ -1,4 +1,5 @@
-#version 330 core
+#version 450 core
+
 in vec3 vColor; // Interpolated color from the vertex shader
 in vec3 vNormal; // Interpolated normal from vertex shader
 in vec3 vPosition; // Position in world space
