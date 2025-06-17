@@ -76,7 +76,19 @@ target_include_directories(AssimpQtViewer PRIVATE
 )
 
 if(WIN32)
-    # Automatically detect the Qt bin folder (assumes Qt6::qmake is found)
+   install(TARGETS AssimpQtViewer
+        RUNTIME_DEPENDENCIES
+            PRE_EXCLUDE_REGEXES
+		        [[hvsifiletrust.*]]
+		        [[pdmutilities.*]]
+		        [[api-ms-win-.*]]
+		        [[ext-ms-.*]]
+                [[qt6.*\\.dll]]                                                         # qt_generate_deploy_app_script will take care about Qt's libs
+            POST_EXCLUDE_REGEXES
+                [[.*system32.*.dll]]
+    )
+
+     # Automatically detect the Qt bin folder (assumes Qt6::qmake is found)
     get_target_property(QT_QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
     get_filename_component(QT_BIN_DIR "${QT_QMAKE_EXECUTABLE}" DIRECTORY)
     
@@ -88,4 +100,29 @@ if(WIN32)
             "$<TARGET_FILE:AssimpQtViewer>"
         COMMENT "Running windeployqt to copy Qt dependencies"        
     )
+
+    # Find windeployqt
+    get_target_property(QT_QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
+    get_filename_component(QT_WINDEPLOYQT_EXECUTABLE ${QT_QMAKE_EXECUTABLE} PATH)
+    set(QT_WINDEPLOYQT_EXECUTABLE "${QT_WINDEPLOYQT_EXECUTABLE}/windeployqt.exe")
+    
+    # Install script that runs windeployqt
+    install(CODE "
+        execute_process(
+            COMMAND ${QT_WINDEPLOYQT_EXECUTABLE} \${CMAKE_INSTALL_PREFIX}/bin/AssimpQtViewer.exe
+            WORKING_DIRECTORY \${CMAKE_INSTALL_PREFIX}
+        )
+    ")
+
+    if(QT_VERSION_MAJOR EQUAL 6)
+        qt_generate_deploy_app_script(
+            TARGET AssimpQtViewer
+            OUTPUT_SCRIPT deploy_script
+            NO_UNSUPPORTED_PLATFORM_ERROR
+            NO_COMPILER_RUNTIME
+        )
+
+        install(SCRIPT ${deploy_script})
+    endif()
 endif()
+
