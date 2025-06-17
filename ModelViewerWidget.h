@@ -3,7 +3,7 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <QOpenGLFunctions>
-#include <QOpenGLFunctions_3_3_Core>
+#include <QOpenGLFunctions_4_5_Core>
 #include <QOpenGLExtraFunctions>
 #include <QOpenGLWidget>
 #include <QString>
@@ -29,7 +29,7 @@ enum class ViewProjection
 };
 
 
-class ModelViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions_3_3_Core
+class ModelViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions_4_5_Core
 {
     Q_OBJECT
 
@@ -113,8 +113,9 @@ private:
 
     void computeBounds(const aiMesh *mesh, const aiMatrix4x4 &currentTransform, aiVector3D &minimum,
                        aiVector3D &maximum);
-
-    void drawGradientBackground();
+        
+    void drawGradientBackground(float top_r, float top_g, float top_b, float top_a,
+        float bot_r, float bot_g, float bot_b, float bot_a, int gradientStyle);
 
     void drawTrihedronOverlay();
 
@@ -226,7 +227,12 @@ private:
     QAction *m_separatorAction = nullptr;
 
     std::unique_ptr<ShaderProgram> m_shader;
+
     std::unique_ptr<ShaderProgram> m_backgroundShader; // Shader for background gradient
+    QOpenGLVertexArrayObject m_bgVAO;
+    QColor      m_bgTopColor;
+    QColor      m_bgBotColor;
+    int _gradientStyle = 0; // 0=Vertical, 1=Horizontal, 2=TopLeftToBottomRight, 3=TopRightToBottomLeft
 
     std::unique_ptr<Trihedron> m_trihedron; // Trihedron for orientation reference    
     std::unique_ptr<ShaderProgram> m_trihedronShader; // Shader for overlay elements like trihedron

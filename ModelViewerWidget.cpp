@@ -39,6 +39,9 @@ ModelViewerWidget::ModelViewerWidget(QWidget *parent)
     fmt.setOption(QSurfaceFormat::DebugContext);
     QSurfaceFormat::setDefaultFormat(fmt);
 
+    m_bgTopColor = QColor::fromRgbF(0.45f, 0.45f, 0.45f, 1.0f);
+    m_bgBotColor = QColor::fromRgbF(0.9f, 0.9f, 0.9f, 1.0f);
+
     m_modelMatrix.setToIdentity();
     m_viewMatrix.setToIdentity();
     m_projectionMatrix.setToIdentity();
@@ -184,7 +187,8 @@ void ModelViewerWidget::paintGL()
     glClearColor(0.05f, 0.05f, 0.05f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    drawGradientBackground();
+    drawGradientBackground(m_bgTopColor.redF(), m_bgTopColor.greenF(), m_bgTopColor.blueF(), m_bgTopColor.alphaF(),
+        m_bgBotColor.redF(), m_bgBotColor.greenF(), m_bgBotColor.blueF(), m_bgBotColor.alphaF(), _gradientStyle);
 
     glEnable(GL_DEPTH_TEST);
     m_viewMatrix = m_camera->getViewMatrix();
@@ -359,59 +363,29 @@ void ModelViewerWidget::computeBoundingSphere(const aiMesh *iMesh, const aiMatri
     oRadius = maxExtent * 0.5f;
 }
 
-void ModelViewerWidget::drawGradientBackground()
+
+void ModelViewerWidget::drawGradientBackground(float top_r, float top_g, float top_b, float top_a, float bot_r, float bot_g, float bot_b, float bot_a, int gradientStyle)
 {
     glViewport(0, 0, width(), height());
+    if (!m_bgVAO.isCreated())
+    {
+        m_bgVAO.create();
+    }
 
     glDisable(GL_DEPTH_TEST);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
-    // Vertex data: positions and colors
-    float vertices[] = {
-        // Position      // Color
-        -1.0f, 1.0f, 0.3f, 0.3f, 0.3f, // Top left
-        1.0f, 1.0f, 0.55f, 0.55f, 0.55f, // Top right
-        1.0f, -1.0f, 0.95f, 0.95f, 0.95f, // Bottom right
-        -1.0f, -1.0f, 0.7f, 0.7f, 0.7f // Bottom left
-    };
+    m_backgroundShader->bind();
 
-    unsigned int indices[] = {
-        0, 1, 2, // First triangle
-        2, 3, 0 // Second triangle
-    };
+    int GRADIENT_STYLE = 0; // Default gradient style, can be changed based on user preference
+    m_backgroundShader->setUniformValue("top_color", QVector4D(top_r, top_g, top_b, top_a));
+    m_backgroundShader->setUniformValue("bot_color", QVector4D(bot_r, bot_g, bot_b, bot_a));
+    m_backgroundShader->setUniformValue("gradient_style", gradientStyle);  // Pass the gradient style
 
-    // Generate and bind a VAO and VBO for the vertices
-    unsigned int VAO, VBO, EBO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
-    glGenBuffers(1, &EBO);
+    m_bgVAO.bind();
+    glDrawArrays(GL_TRIANGLES, 0, 3);
 
-    glBindVertexArray(VAO);
-
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
-
-    // Position attribute
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *) 0);
-    glEnableVertexAttribArray(0);
-
-    // Color attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *) (2 * sizeof(float)));
-    glEnableVertexAttribArray(1);
-
-    // Use your custom shader program
-    m_backgroundShader->bind(); // Assumes you have a Shader class that handles compiling/linking shaders
-    glBindVertexArray(VAO);
-    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-
-    // Cleanup
-    glBindVertexArray(0);
-    glDeleteBuffers(1, &VBO);
-    glDeleteBuffers(1, &EBO);
-    glDeleteVertexArrays(1, &VAO);
+    glEnable(GL_DEPTH_TEST);
 }
 
 void ModelViewerWidget::drawTrihedronOverlay()
