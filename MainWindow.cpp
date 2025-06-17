@@ -94,9 +94,7 @@ MainWindow::MainWindow(QWidget *parent)
     {
         QAction *action = new QAction(this);
         action->setVisible(false);
-        connect(action, &QAction::triggered, this, [=]() {
-            openFile(action->data().toString());
-        });
+        connect(action, &QAction::triggered, this, &MainWindow::openRecentFile);
         recentFileActions.append(action);
         recentFilesMenu->addAction(action);
     }
@@ -153,7 +151,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 void MainWindow::updateRecentFilesMenu()
 {
-    QSettings settings("Sharjith N", "Assimp Qt Viewer");
+    QSettings settings(QCoreApplication::organizationName(), QCoreApplication::applicationName());
     recentFiles = settings.value("recentFiles").toStringList();
 
     int numRecentFiles = qMin(recentFiles.size(), MaxRecentFiles);
@@ -174,9 +172,17 @@ void MainWindow::updateRecentFilesMenu()
     separatorAction->setVisible(numRecentFiles > 0);
 }
 
+void MainWindow::removeFromRecentFiles(const QString& filePath)
+{
+    QSettings settings(QCoreApplication::organizationName(), QCoreApplication::applicationName());
+    QStringList files = settings.value("recentFiles").toStringList();
+    files.removeAll(filePath); // Remove duplicates
+    settings.setValue("recentFiles", files);
+}
+
 void MainWindow::addToRecentFiles(const QString &filePath)
 {
-    QSettings settings("Sharjith N", "Assimp Qt Viewer");
+    QSettings settings(QCoreApplication::organizationName(), QCoreApplication::applicationName());
     QStringList files = settings.value("recentFiles").toStringList();
     files.removeAll(filePath); // Remove duplicates
     files.prepend(filePath); // Add to top
@@ -188,14 +194,14 @@ void MainWindow::addToRecentFiles(const QString &filePath)
 
 void MainWindow::clearRecentFiles()
 {
-    QSettings settings("Sharjith N", "Assimp Qt Viewer");
+    QSettings settings(QCoreApplication::organizationName(), QCoreApplication::applicationName());
     settings.remove("recentFiles");
     updateRecentFilesMenu();
 }
 
 OpenModelBehavior MainWindow::openModelBehaviorSetting() const
 {
-    QSettings settings;
+    QSettings settings(QCoreApplication::organizationName(), QCoreApplication::applicationName());
     QString value = settings.value("openModelBehavior", "Ask").toString();
     if (value == "ThisWindow") return OpenModelBehavior::ThisWindow;
     if (value == "NewWindow") return OpenModelBehavior::NewWindow;
@@ -314,6 +320,34 @@ void MainWindow::loadModel(const QString &path)
 void MainWindow::showFileReadingProgress(float percent)
 {
     MainWindow::setProgressValue((int) ((float) percent * 100.0f));
+}
+
+void MainWindow::openRecentFile()
+{
+    if (const QAction* action = qobject_cast<const QAction*>(sender()))
+    {
+        QString filePath = action->data().toString();
+        if (!QFile::exists(filePath))
+        {
+            QMessageBox::StandardButton reply = QMessageBox::question(
+                this,
+                tr("File Not Found"),
+                tr("The file '%1' no longer exists. Would you like to remove it from the recent files?").arg(filePath),
+                QMessageBox::Yes | QMessageBox::No
+            );
+
+            if (reply == QMessageBox::Yes)
+            {
+                removeFromRecentFiles(filePath);
+                updateRecentFilesMenu();
+            }
+            return;
+        }
+
+        QApplication::setOverrideCursor(Qt::WaitCursor);
+        openFile(filePath);
+        QApplication::restoreOverrideCursor();        
+    }
 }
 
 void MainWindow::setProgressValue(const int &value)

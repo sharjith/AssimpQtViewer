@@ -42,7 +42,11 @@ private slots:
 
     void showFileReadingProgress(float percent);
 
+    void openRecentFile();
+
     void updateRecentFilesMenu();
+
+    void removeFromRecentFiles(const QString& filePath);
 
     void clearRecentFiles();
 
