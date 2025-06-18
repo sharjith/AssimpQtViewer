@@ -16,6 +16,7 @@
 
 class FlyOutViewButton;
 class GLCamera;
+class QPropertyAnimation;
 
 enum class ViewProjection
 {
@@ -36,8 +37,6 @@ class ModelViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions_4_5_C
 
 public:
     explicit ModelViewerWidget(QWidget *parent = nullptr);
-
-    void setupViewToolbar();
 
     void loadModel(const QString &filePath);
 
@@ -121,6 +120,12 @@ private slots:
     void onActionTrimetricViewTriggered(bool checked);
 
 private:
+    void setupViewToolbar();
+    
+    void showToolbarAnimated();
+    
+    void hideToolbarAnimated();
+
     void setupContextMenu();
 
     void loadNodeMeshes(aiNode *node);
@@ -200,6 +205,9 @@ private:
     QAction* m_isometricView;
     QAction* m_dimetricView;
     QAction* m_trimetricView;
+    QPropertyAnimation* _toolbarAnimation;
+    QRect _toolbarVisibleRect;
+    QRect _toolbarHiddenRect;
 
     const aiScene *m_scene = nullptr;
     Assimp::Importer m_importer;
@@ -278,4 +286,5 @@ private:
 
     std::unique_ptr<Trihedron> m_trihedron; // Trihedron for orientation reference    
     std::unique_ptr<ShaderProgram> m_trihedronShader; // Shader for overlay elements like trihedron
+
 };

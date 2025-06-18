@@ -18,6 +18,7 @@
 #include <QToolButton>
 #include <QMenu>
 #include <QStyleFactory>
+#include <QPropertyAnimation>
 
 
 #ifdef _WIN32
@@ -75,9 +76,10 @@ void ModelViewerWidget::setupViewToolbar()
     _viewToolbar->setFixedHeight(64);
 
     QHBoxLayout* layout = new QHBoxLayout(_viewToolbar);
-    //_viewToolbar->setVisible(false); // Start hidden
-    // Install event filter on the toolbar
-    _viewToolbar->installEventFilter(this);
+
+    _toolbarAnimation = new QPropertyAnimation(_viewToolbar, "geometry", this);
+    _toolbarAnimation->setDuration(300); // 300ms animation
+    _toolbarAnimation->setEasingCurve(QEasingCurve::OutCubic);
 
     layout->setContentsMargins(4, 4, 4, 4);
     layout->setSpacing(6);
@@ -123,7 +125,7 @@ void ModelViewerWidget::setupViewToolbar()
     QMenu* axoMenu = new QMenu;
     axoMenu->setStyleSheet(
         "QMenu {"
-        "    background-color: rgba(255, 255, 255, 140);"
+        "    background-color: rgba(255, 255, 255, 100);"
         "    border: 1px solid gray;"
         "    border-radius: 4px;"
         "    padding: 2px;"
@@ -1055,24 +1057,36 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent *event)
     {
         if (event->buttons() == Qt::NoButton)
         {
-            // Check if the mouse is within the toolbar's bounding rectangle
-            QRect toolbarRect = _viewToolbar->geometry();
-            if (toolbarRect.contains(event->pos()))
+            // Create a trigger area at the bottom of the widget for showing toolbar
+            int triggerHeight = 50; // Height of area at bottom that triggers toolbar
+            QRect triggerArea(0, height() - triggerHeight, width(), triggerHeight);
+
+            // Check if mouse is in trigger area OR over visible toolbar
+            bool mouseInTriggerArea = triggerArea.contains(event->pos());
+            bool mouseOverToolbar = _toolbarVisibleRect.contains(event->pos()) &&
+                _viewToolbar->isVisible();
+
+            if (mouseInTriggerArea || mouseOverToolbar)
             {
-                // Mouse is over the toolbar area, show the toolbar
-                _viewToolbar->setVisible(true);
+                // Mouse is in trigger area or over toolbar, show it
+                showToolbarAnimated();
             }
             else
             {
-                // Mouse is outside the toolbar area, hide the toolbar
-                QTimer::singleShot(200, [this]() {
-                    if (!_viewToolbar->underMouse())
+                // Mouse is outside trigger area, hide the toolbar
+                QTimer::singleShot(2000, [this]() {
+                    // Check if mouse is still outside trigger area and not over toolbar
+                    QPoint globalPos = QCursor::pos();
+                    QPoint localPos = mapFromGlobal(globalPos);
+                    QRect triggerArea(0, height() - 50, width(), 50);
+
+                    if (!triggerArea.contains(localPos) && !_viewToolbar->underMouse())
                     {
-                        _viewToolbar->setVisible(false);
+                        hideToolbarAnimated();
                     }
                     });
             }
-        }        
+        }
     }
 
     update();
@@ -1243,7 +1257,32 @@ void ModelViewerWidget::resizeEvent(QResizeEvent *event)
         y = std::max(0, y);
 
         _viewToolbar->move(x, y);
+
+        _toolbarVisibleRect = _viewToolbar->geometry();
+        _toolbarHiddenRect = _toolbarVisibleRect;
+        _toolbarHiddenRect.moveTop(height() + 20); // Move completely below widget
+
     }
+}
+
+void ModelViewerWidget::showToolbarAnimated()
+{
+    if (_toolbarAnimation->state() == QAbstractAnimation::Running)
+        _toolbarAnimation->stop();
+
+    _toolbarAnimation->setStartValue(_viewToolbar->geometry());
+    _toolbarAnimation->setEndValue(_toolbarVisibleRect);
+    _toolbarAnimation->start();
+}
+
+void ModelViewerWidget::hideToolbarAnimated()
+{
+    if (_toolbarAnimation->state() == QAbstractAnimation::Running)
+        _toolbarAnimation->stop();
+
+    _toolbarAnimation->setStartValue(_viewToolbar->geometry());
+    _toolbarAnimation->setEndValue(_toolbarHiddenRect);
+    _toolbarAnimation->start();
 }
 
 
