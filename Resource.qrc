@@ -19,6 +19,7 @@
         <file>res/expandall.png</file>
         <file>res/dimetric.png</file>
         <file>res/trimetric.png</file>
+        <file>res/multiview.png</file>
     </qresource>
     <qresource prefix="/shaders">
         <file>shaders/gradientbg.frag</file>
@@ -27,5 +28,7 @@
         <file>shaders/trihedron.vert</file>
         <file>shaders/mesh.frag</file>
         <file>shaders/mesh.vert</file>
+        <file>shaders/splitScreen.frag</file>
+        <file>shaders/splitScreen.vert</file>
     </qresource>
 </RCC>

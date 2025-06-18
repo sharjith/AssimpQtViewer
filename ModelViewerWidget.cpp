@@ -64,6 +64,7 @@ ModelViewerWidget::ModelViewerWidget(QWidget *parent)
     _rubberBand->setStyle(QStyleFactory::create("Fusion"));
 
     setFocusPolicy(Qt::StrongFocus);
+	setMouseTracking(true);
 }
 
 void ModelViewerWidget::setupViewToolbar()
@@ -74,6 +75,10 @@ void ModelViewerWidget::setupViewToolbar()
     _viewToolbar->setFixedHeight(64);
 
     QHBoxLayout* layout = new QHBoxLayout(_viewToolbar);
+    //_viewToolbar->setVisible(false); // Start hidden
+    // Install event filter on the toolbar
+    _viewToolbar->installEventFilter(this);
+
     layout->setContentsMargins(4, 4, 4, 4);
     layout->setSpacing(6);
 
@@ -170,6 +175,15 @@ void ModelViewerWidget::setupViewToolbar()
         m_toolButtonIsometricView, SLOT(setDefaultAction(QAction*)));
 
     layout->addWidget(createViewButton(":/icons/res/fit-all.png", "Fit All", [this]() { fitToView(); }, _viewToolbar));
+    layout->addWidget(createViewButton(":/icons/res/multiview.png", "Zoom In",
+        [this]() { 
+            m_multiViewEnabled = !m_multiViewEnabled; 
+            if(m_multiViewEnabled)
+				m_camera->setView(GLCamera::ViewProjection::SE_ISOMETRIC_VIEW);
+            fitToView();
+            update(); 
+        },
+        _viewToolbar));
 
     QToolButton* projToggleButton = new QToolButton(_viewToolbar);
     projToggleButton->setCheckable(true);
@@ -228,6 +242,10 @@ void ModelViewerWidget::initializeGL()
     m_camera->setProjectionType(GLCamera::ProjectionType::PERSPECTIVE);
     m_camera->setView(GLCamera::ViewProjection::SE_ISOMETRIC_VIEW);
 
+    m_orthoCamera = new GLCamera(height(), width(), m_viewRadius, 45);
+    m_orthoCamera->setProjectionType(GLCamera::ProjectionType::ORTHOGRAPHIC);
+    m_orthoCamera->setView(GLCamera::ViewProjection::SE_ISOMETRIC_VIEW);
+
     if (!m_scene)
     {
         // Set up a default camera view for the test triangle
@@ -253,6 +271,10 @@ void ModelViewerWidget::initializeGL()
                            ":/shaders/shaders/trihedron.frag");
 
     m_trihedron = std::make_unique<Trihedron>(m_trihedronShader.get());
+
+	m_bgSplitShader = std::make_unique<ShaderProgram>();
+    m_bgSplitShader->loadCompileAndLinkShaderFromFile(":/shaders/shaders/splitScreen.vert",
+		":/shaders/shaders/splitScreen.frag");
 }
 
 void ModelViewerWidget::resizeGL(int w, int h)
@@ -287,8 +309,21 @@ void ModelViewerWidget::paintGL()
         m_bgBotColor.redF(), m_bgBotColor.greenF(), m_bgBotColor.blueF(), m_bgBotColor.alphaF(), m_gradientStyle);
 
     glEnable(GL_DEPTH_TEST);
-    m_viewMatrix = m_camera->getViewMatrix();
-    m_projectionMatrix = m_camera->getProjectionMatrix();
+
+    if (!m_multiViewEnabled)
+    {
+        render(m_camera);
+        drawTrihedronOverlay(0, 0, m_camera); // Draw trihedron in mini viewport
+    }
+    else
+        renderMultiView(); // Render all views in multi-view mode
+}
+
+
+void ModelViewerWidget::render(GLCamera* camera)
+{
+    m_viewMatrix = camera->getViewMatrix();
+    m_projectionMatrix = camera->getProjectionMatrix();
 
 
     if (!m_glMeshes.empty())
@@ -315,9 +350,9 @@ void ModelViewerWidget::paintGL()
         m_shader->setUniformValue("mvp", m_projectionMatrix * m_viewMatrix);
         m_shader->setUniformValue("view", m_viewMatrix);
 
-        for (const auto &meshptr: m_glMeshes)
+        for (const auto& meshptr : m_glMeshes)
         {
-            GLMesh *mesh = meshptr.get(); // Use smart pointer to access raw pointer
+            GLMesh* mesh = meshptr.get(); // Use smart pointer to access raw pointer
 
             // Skip rendering if the mesh is not visible
             if (!mesh->isVisible())
@@ -345,7 +380,8 @@ void ModelViewerWidget::paintGL()
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                 m_shader->setUniformValue("isSelected", true);
-            } else
+            }
+            else
             {
                 glDisable(GL_BLEND);
                 m_shader->setUniformValue("isSelected", false);
@@ -356,7 +392,8 @@ void ModelViewerWidget::paintGL()
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
                 glDepthMask(GL_FALSE);
-            } else
+            }
+            else
             {
                 glDisable(GL_BLEND);
                 glDepthMask(GL_TRUE);
@@ -364,8 +401,100 @@ void ModelViewerWidget::paintGL()
             mesh->draw();
         }
     }
+}
 
-    drawTrihedronOverlay(); // Draw trihedron in mini viewport
+void ModelViewerWidget::renderMultiView()
+{
+    glViewport(0, 0, width(), height());
+
+    GLCamera::ProjectionType currentPro = m_camera->getProjectionType();
+	m_camera->setProjectionType(GLCamera::ProjectionType::ORTHOGRAPHIC);
+	m_projectionMatrix = m_camera->getProjectionMatrix();
+	m_viewMatrix = m_camera->getViewMatrix();  
+    // Render orthographic views with ortho view camera
+    // Top View
+    m_orthoCamera->setScreenSize(width() / 2, height() / 2);
+    m_orthoCamera->setProjectionMatrix(m_projectionMatrix);
+    m_orthoCamera->setViewMatrix(m_viewMatrix);
+    m_orthoCamera->setPosition(m_camera->getPosition());
+    glViewport(0, 0, width() / 2, height() / 2);
+    m_orthoCamera->setView(GLCamera::ViewProjection::TOP_VIEW);
+    render(m_orthoCamera);
+	drawTrihedronOverlay(0, 0, m_orthoCamera); // Draw trihedron in mini viewport
+    
+    // Front View
+    glViewport(0, height() / 2, width() / 2, height() / 2);
+    m_orthoCamera->setView(GLCamera::ViewProjection::FRONT_VIEW);
+    render(m_orthoCamera);
+	drawTrihedronOverlay(0, height() / 2, m_orthoCamera); // Draw trihedron in mini viewport
+    
+    // Left View
+    glViewport(width() / 2, height() / 2, width() / 2, height() / 2);
+    m_orthoCamera->setView(GLCamera::ViewProjection::LEFT_VIEW);
+    render(m_orthoCamera);
+	drawTrihedronOverlay(width() / 2, height() / 2, m_orthoCamera); // Draw trihedron in mini viewport
+    
+    // Render isometric view with primary camera
+    // Isometric View
+    glViewport(width() / 2, 0, width() / 2, height() / 2);	
+    render(m_camera);    
+	drawTrihedronOverlay(width() / 2, 0, m_camera); // Draw trihedron in mini viewport
+
+	m_shader->release(); // Release the shader after rendering
+	splitScreen(); // Draw split screen lines
+
+    // restore the original projection type of the main camera
+	m_camera->setProjectionType(currentPro);
+}
+
+void ModelViewerWidget::splitScreen()
+{
+    if (!m_bgSplitVAO.isCreated())
+    {
+        m_bgSplitVAO.create();
+        m_bgSplitVAO.bind();
+    }
+
+    if (!m_bgSplitVBO.isCreated())
+    {
+        m_bgSplitVBO = QOpenGLBuffer(QOpenGLBuffer::VertexBuffer);
+        m_bgSplitVBO.create();
+        m_bgSplitVBO.bind();
+        m_bgSplitVBO.setUsagePattern(QOpenGLBuffer::StaticDraw);
+
+        static const std::vector<float> vertices = {
+            -static_cast<float>(width()) / 2,
+            0,
+            static_cast<float>(width()) / 2,
+            0,
+            0,
+            -static_cast<float>(height()) / 2,
+            0,
+            static_cast<float>(height()) / 2,
+        };
+
+        m_bgSplitVBO.allocate(vertices.data(), static_cast<int>(vertices.size() * sizeof(float)));
+
+        m_bgSplitShader->bind();
+        m_bgSplitShader->enableAttributeArray("vertexPosition");
+        m_bgSplitShader->setAttributeBuffer("vertexPosition", GL_FLOAT, 0, 2);
+
+        m_bgSplitVBO.release();
+    }
+
+    glViewport(0, 0, width(), height());
+
+    glDisable(GL_DEPTH_TEST);
+
+    m_bgSplitVAO.bind();
+    glLineWidth(0.5);
+    glDrawArrays(GL_LINES, 0, 4);
+    glLineWidth(1);
+
+    glEnable(GL_DEPTH_TEST);
+
+    m_bgSplitVAO.release();
+    m_bgSplitShader->release();
 }
 
 
@@ -531,19 +660,19 @@ void ModelViewerWidget::loadBgColorSettings()
     }
 }
 
-void ModelViewerWidget::drawTrihedronOverlay()
+void ModelViewerWidget::drawTrihedronOverlay(int xOffset, int yOffset, GLCamera* camera)
 {
     const int overlaySize = 110; // Size of mini viewport
     const int margin = 10; // Margin from the bottom-left corner
 
     // Set up the mini viewport
-    glViewport(margin, margin, overlaySize, overlaySize);
+    glViewport(xOffset + margin, yOffset + margin, overlaySize, overlaySize);
     glClear(GL_DEPTH_BUFFER_BIT); // Clear depth buffer for the overlay
     glEnable(GL_DEPTH_TEST); // Enable depth testing for the overlay
 
     // Create projection matrix
     QMatrix4x4 projection;
-    if (m_camera->getProjectionType() == GLCamera::ProjectionType::PERSPECTIVE)
+    if (camera->getProjectionType() == GLCamera::ProjectionType::PERSPECTIVE)
     {
         // Narrow field of view for better appearance in small viewport
         projection.perspective(30.0, 1.0, 0.1, 10.0);
@@ -561,7 +690,7 @@ void ModelViewerWidget::drawTrihedronOverlay()
                 QVector3D(0.0, 1.0, 0.0)); // Up vector
 
     // Extract the camera's rotation matrix
-    QMatrix4x4 cameraView = m_camera->getViewMatrix();
+    QMatrix4x4 cameraView = camera->getViewMatrix();
 
     // Remove the translation component
     cameraView.setColumn(3, QVector4D(0, 0, 0, 1)); // Zero out the translation part
@@ -853,6 +982,8 @@ void ModelViewerWidget::mousePressEvent(QMouseEvent *event)
     {
         pickAtScreenPosition(event->pos());       
     }
+
+    QOpenGLWidget::mousePressEvent(event);
 }
 
 
@@ -915,12 +1046,38 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent *event)
     else
     {
         if(event->modifiers() != Qt::ControlModifier)
-            _rubberBand->setGeometry(QRect(m_leftButtonPoint, event->pos()).normalized());
+            _rubberBand->setGeometry(QRect(m_leftButtonPoint, event->pos()).normalized());        
     }
 
     m_lastMousePos = downPoint;
 
+    if (_viewToolbar) // Hide or show toolbar based on mouse position
+    {
+        if (event->buttons() == Qt::NoButton)
+        {
+            // Check if the mouse is within the toolbar's bounding rectangle
+            QRect toolbarRect = _viewToolbar->geometry();
+            if (toolbarRect.contains(event->pos()))
+            {
+                // Mouse is over the toolbar area, show the toolbar
+                _viewToolbar->setVisible(true);
+            }
+            else
+            {
+                // Mouse is outside the toolbar area, hide the toolbar
+                QTimer::singleShot(200, [this]() {
+                    if (!_viewToolbar->underMouse())
+                    {
+                        _viewToolbar->setVisible(false);
+                    }
+                    });
+            }
+        }        
+    }
+
     update();
+
+    QOpenGLWidget::mouseMoveEvent(event);
 }
 
 void ModelViewerWidget::mouseReleaseEvent(QMouseEvent *event)
@@ -958,10 +1115,13 @@ void ModelViewerWidget::mouseReleaseEvent(QMouseEvent *event)
         m_rotationVelocity = QVector2D(0, 0);
         m_inertiaTimer->stop();
     }
-
-    Q_UNUSED(event);
+        
     if (!(event->modifiers() & Qt::ControlModifier))
         m_mode = InteractionMode::Select;
+    else
+		m_mode = InteractionMode::None;
+
+    QOpenGLWidget::mouseReleaseEvent(event);
 }
 
 void ModelViewerWidget::wheelEvent(QWheelEvent *event)

@@ -70,6 +70,12 @@ protected:
 
     void paintGL() override;
 
+    void render(GLCamera *camera);
+
+	void renderMultiView();
+
+    void splitScreen();
+
     void mousePressEvent(QMouseEvent *event) override;
 
     void mouseMoveEvent(QMouseEvent *event) override;
@@ -136,7 +142,7 @@ private:
 
     void loadBgColorSettings();
 
-    void drawTrihedronOverlay();
+    void drawTrihedronOverlay(int xOffset, int yOffset, GLCamera* camera);
 
     void updateCamera();
 
@@ -187,6 +193,7 @@ private:
     QToolButton *createViewButton(const QString &iconPath, const QString &tooltip,
                                   const std::function<void()> &callback, QWidget *parent = nullptr);
 
+
 private:
 
     FlyOutViewButton* m_toolButtonIsometricView;
@@ -197,7 +204,8 @@ private:
     const aiScene *m_scene = nullptr;
     Assimp::Importer m_importer;
 
-    GLCamera *m_camera = nullptr; // Custom camera class for handling camera operations
+    GLCamera* m_camera = nullptr; // Camera class for handling camera operations
+	GLCamera* m_orthoCamera = nullptr; // Orthographic camera for projection views
 
     QVector3D m_cameraPos; // Current camera position
     QVector3D m_viewCenter; // Model center point
@@ -208,7 +216,7 @@ private:
     bool m_sceneUpdated;
 
     // Interaction modes
-    enum class InteractionMode { Select, Zoom, Rotate, Pan };
+    enum class InteractionMode { Select, Zoom, Rotate, Pan, None };
 
     QPoint m_leftButtonPoint;
     QPoint m_lastMousePos;
@@ -262,6 +270,11 @@ private:
     QColor      m_bgTopColor;
     QColor      m_bgBotColor;
     int m_gradientStyle = 0; // 0=Vertical, 1=Horizontal, 2=TopLeftToBottomRight, 3=TopRightToBottomLeft
+
+    std::unique_ptr<ShaderProgram> m_bgSplitShader;
+    QOpenGLVertexArrayObject m_bgSplitVAO;
+    QOpenGLBuffer m_bgSplitVBO;
+	bool m_multiViewEnabled = false; // Flag to enable/disable multi-view mode  
 
     std::unique_ptr<Trihedron> m_trihedron; // Trihedron for orientation reference    
     std::unique_ptr<ShaderProgram> m_trihedronShader; // Shader for overlay elements like trihedron
