@@ -37,6 +37,8 @@ class ModelViewerWidget : public QOpenGLWidget, protected QOpenGLFunctions_4_5_C
 public:
     explicit ModelViewerWidget(QWidget *parent = nullptr);
 
+    void setupViewToolbar();
+
     void loadModel(const QString &filePath);
 
     const aiScene *getScene() const { return m_scene; }
