@@ -14,6 +14,7 @@
 #include "Trihedron.h"
 #include "ShaderProgram.h"
 
+class ViewToolbar;
 class FlyOutViewButton;
 class GLCamera;
 class QPropertyAnimation;
@@ -115,13 +116,7 @@ private slots:
 
     void showAllMeshes();
 
-    void onActionIsometricViewTriggered(bool checked);
-    void onActionDimetricViewTriggered(bool checked);
-    void onActionTrimetricViewTriggered(bool checked);
-
-private:
-    void setupViewToolbar();
-    
+private:    
     void showToolbarAnimated();
     
     void hideToolbarAnimated();
@@ -197,19 +192,21 @@ private:
     QRect getClientRectFromPoint(const QPoint& pixel);
     QVector3D get3dTranslationVectorFromMousePoints(const QPoint &start, const QPoint &end);
 
-    QToolButton *createViewButton(const QString &iconPath, const QString &tooltip,
-                                  const std::function<void()> &callback, QWidget *parent = nullptr);
+   /* QToolButton *createViewButton(const QString &iconPath, const QString &tooltip,
+                                  const std::function<void()> &callback, QWidget *parent = nullptr);*/
 
 
 private:
 
-    FlyOutViewButton* m_toolButtonIsometricView;
+    /*FlyOutViewButton* m_toolButtonIsometricView;
     QAction* m_isometricView;
     QAction* m_dimetricView;
     QAction* m_trimetricView;
     QPropertyAnimation* _toolbarAnimation;
     QRect _toolbarVisibleRect;
-    QRect _toolbarHiddenRect;
+    QRect _toolbarHiddenRect;*/
+
+    ViewToolbar* m_viewToolbar;
 
     const aiScene *m_scene = nullptr;
     Assimp::Importer m_importer;
@@ -236,7 +233,7 @@ private:
 
     ViewProjection m_viewProjection = ViewProjection::Custom;
 
-    QWidget *_viewToolbar;
+    //QWidget *_viewToolbar;
 
     bool m_isDragging = false;
     aiNode *m_lastPickedNode = nullptr;

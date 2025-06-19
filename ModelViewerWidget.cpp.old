@@ -3,7 +3,6 @@
 #include "ModelViewerWidget.h"
 #include "GLCamera.h"
 #include "FlyOutViewButton.h"
-#include "ViewToolbar.h"
 #include <assimp/postprocess.h>
 #include <cfloat>
 #include <QApplication>
@@ -56,38 +55,7 @@ ModelViewerWidget::ModelViewerWidget(QWidget *parent)
     m_inertiaTimer->setInterval(16); // ~60 FPS
     connect(m_inertiaTimer, &QTimer::timeout, this, &ModelViewerWidget::onInertiaTimeout);
 
-    m_viewToolbar = new ViewToolbar(this);
-    m_viewToolbar->reposition(width(), height());
-
-    connect(m_viewToolbar, &ViewToolbar::viewSelected, this, [this](const QString& view) {
-        if (view == "Top") setViewTop();
-        else if (view == "Front") setViewFront();
-        else if (view == "Left") setViewLeft();
-        else if (view == "Bottom") setViewBottom();
-        else if (view == "Rear") setViewRear();
-        else if (view == "Right") setViewRight();
-    });
-
-    connect(m_viewToolbar, &ViewToolbar::axonometricSelected, this, [this](const QString& type) {
-        if (type == "Isometric") setViewAxonometric();
-        else if (type == "Dimetric") setViewDimetric();
-        else if (type == "Trimetric") setViewTrimetric();
-    });
-
-    connect(m_viewToolbar, &ViewToolbar::fitToViewRequested, this, &ModelViewerWidget::fitToView);
-
-    connect(m_viewToolbar, &ViewToolbar::projectionToggled, this, [this](bool ortho) {
-        m_camera->setProjectionType(ortho ? GLCamera::ProjectionType::ORTHOGRAPHIC : GLCamera::ProjectionType::PERSPECTIVE);
-        update();
-    });
-
-    connect(m_viewToolbar, &ViewToolbar::multiViewToggled, this, [this](bool enabled) {
-        m_multiViewEnabled = enabled;
-        if (enabled)
-            m_camera->setView(GLCamera::ViewProjection::SE_ISOMETRIC_VIEW);
-        fitToView();
-        update();
-    });
+    setupViewToolbar();
 
     setContextMenuPolicy(Qt::CustomContextMenu);
     connect(this, &QWidget::customContextMenuRequested,
@@ -100,6 +68,163 @@ ModelViewerWidget::ModelViewerWidget(QWidget *parent)
 	setMouseTracking(true);
 }
 
+void ModelViewerWidget::setupViewToolbar()
+{
+    _viewToolbar = new QWidget(this);
+    _viewToolbar->setAttribute(Qt::WA_TransparentForMouseEvents, false);
+    _viewToolbar->setStyleSheet("background: rgba(255, 255, 255, 100); border: 1px solid gray; border-radius: 4px;");
+    _viewToolbar->setFixedHeight(64);
+
+    QHBoxLayout* layout = new QHBoxLayout(_viewToolbar);
+
+    _toolbarAnimation = new QPropertyAnimation(_viewToolbar, "geometry", this);
+    _toolbarAnimation->setDuration(300); // 300ms animation
+    _toolbarAnimation->setEasingCurve(QEasingCurve::OutCubic);
+
+    layout->setContentsMargins(4, 4, 4, 4);
+    layout->setSpacing(6);
+
+    layout->addWidget(createViewButton(":/icons/res/top.png", "Top View", [this]() { setViewTop(); }, _viewToolbar));
+    layout->addWidget(createViewButton(":/icons/res/front.png", "Front View", [this]() { setViewFront(); },
+        _viewToolbar));
+    layout->addWidget(createViewButton(":/icons/res/left.png", "Left View", [this]() { setViewLeft(); }, _viewToolbar));
+    layout->addWidget(createViewButton(":/icons/res/bottom.png", "Bottom View", [this]() { setViewBottom(); },
+        _viewToolbar));
+    layout->addWidget(createViewButton(":/icons/res/back.png", "Rear View", [this]() { setViewRear(); }, _viewToolbar));
+    layout->addWidget(createViewButton(":/icons/res/right.png", "Right View", [this]() { setViewRight(); },
+        _viewToolbar));
+
+    m_toolButtonIsometricView = new FlyOutViewButton(_viewToolbar);
+    m_toolButtonIsometricView->setObjectName(QString::fromUtf8("toolButtonIsometricView"));
+    m_toolButtonIsometricView->setToolTip("Axonometric View");
+    m_toolButtonIsometricView->setIcon(QIcon(":/icons/res/isometric.png"));
+    m_toolButtonIsometricView->setPopupMode(QToolButton::DelayedPopup);
+    m_toolButtonIsometricView->setIconSize(QSize(64, 64));
+    m_toolButtonIsometricView->setAutoRaise(true); // Flat appearance
+
+
+    layout->addWidget(m_toolButtonIsometricView);
+    disconnect(m_toolButtonIsometricView, SIGNAL(clicked()), 0, 0);
+
+    m_isometricView = new QAction(QIcon(":/icons/res/isometric.png"), "Isometric", this);
+    m_isometricView->setObjectName(QString::fromUtf8("isometricView"));
+    m_isometricView->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_1));
+    connect(m_isometricView, &QAction::triggered, this, &ModelViewerWidget::onActionIsometricViewTriggered);
+
+    m_dimetricView = new QAction(QIcon(":/icons/res/dimetric.png"), "Dimetric", this);
+    m_dimetricView->setObjectName(QString::fromUtf8("dimetricView"));
+    m_dimetricView->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_2));
+    connect(m_dimetricView, &QAction::triggered, this, &ModelViewerWidget::onActionDimetricViewTriggered);
+
+    m_trimetricView = new QAction(QIcon(":/icons/res/trimetric.png"), "Trimetric", this);
+    m_trimetricView->setObjectName(QString::fromUtf8("trimetricView"));
+    m_trimetricView->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_3));
+    connect(m_trimetricView, &QAction::triggered, this, &ModelViewerWidget::onActionTrimetricViewTriggered);
+
+    // View
+    QMenu* axoMenu = new QMenu;
+    axoMenu->setStyleSheet(
+        "QMenu {"
+        "    background-color: rgba(255, 255, 255, 100);"
+        "    border: 1px solid gray;"
+        "    border-radius: 4px;"
+        "    padding: 2px;"
+        "    icon-size: 42px;"
+        "}"
+        "QMenu::item {"
+        "    background: transparent;"
+        "    background-color: #f0f0f0;"
+        "    border: 1px solid #c0c0c0;"
+        "    border-radius: 4px;"
+        "    padding: 5px 8px;"
+        "    margin: 3px;"
+        "    min-width: 120px;"
+        "    min-height: 30px;"
+        "    font-weight: normal;"
+        "    color: black;"
+        "}"
+        "QMenu::item:selected {"
+        "    background-color: #e0e0ff;"
+        "    border: 1px solid #a0a0ff;"
+        "    color: black;"
+        "}"
+        "QMenu::item:pressed {"
+        "    background-color: #d0d0ff;"
+        "    border: 1px solid #8080ff;"
+        "    color: black;"
+        "}"
+        "QMenu::icon {"
+        "    padding-left: 10px;"
+        "    padding-right: 8px;"
+        "}"
+        "QMenu::separator {"
+        "    height: 1px;"
+        "    background-color: #c0c0c0;"
+        "    margin: 4px 8px;"
+        "}"
+    );
+    axoMenu->addAction(m_isometricView);
+    axoMenu->addAction(m_dimetricView);
+    axoMenu->addAction(m_trimetricView);
+    // add action to widget as well
+    addAction(m_isometricView);
+    addAction(m_dimetricView);
+    addAction(m_trimetricView);
+
+    m_toolButtonIsometricView->setMenu(axoMenu);
+    m_toolButtonIsometricView->setDefaultAction(m_isometricView);
+    QObject::connect(m_toolButtonIsometricView, SIGNAL(triggered(QAction*)),
+        m_toolButtonIsometricView, SLOT(setDefaultAction(QAction*)));
+
+    layout->addWidget(createViewButton(":/icons/res/fit-all.png", "Fit All", [this]() { fitToView(); }, _viewToolbar));
+    layout->addWidget(createViewButton(":/icons/res/multiview.png", "Zoom In",
+        [this]() { 
+            m_multiViewEnabled = !m_multiViewEnabled; 
+            if(m_multiViewEnabled)
+				m_camera->setView(GLCamera::ViewProjection::SE_ISOMETRIC_VIEW);
+            fitToView();
+            update(); 
+        },
+        _viewToolbar));
+
+    QToolButton* projToggleButton = new QToolButton(_viewToolbar);
+    projToggleButton->setCheckable(true);
+    projToggleButton->setIcon(QIcon(":/icons/res/Perspective.png")); // default icon
+    projToggleButton->setIconSize(QSize(64, 64));
+    projToggleButton->setToolTip("Toggle Projection");
+
+    connect(projToggleButton, &QToolButton::toggled, this, [this, projToggleButton](bool checked) {
+        if (checked)
+        {
+            m_camera->setProjectionType(GLCamera::ProjectionType::ORTHOGRAPHIC);
+            projToggleButton->setIcon(QIcon(":/icons/res/Ortho.png"));
+            projToggleButton->setIconSize(QSize(64, 64));
+            projToggleButton->setToolTip("Switch to Perspective");
+        }
+        else
+        {
+            m_camera->setProjectionType(GLCamera::ProjectionType::PERSPECTIVE);
+            projToggleButton->setIcon(QIcon(":/icons/res/Perspective.png"));
+            projToggleButton->setIconSize(QSize(64, 64));
+            projToggleButton->setToolTip("Switch to Orthographic");
+        }
+        update();
+        });
+
+    layout->addWidget(projToggleButton);
+}
+
+QToolButton *ModelViewerWidget::createViewButton(const QString &iconPath, const QString &tooltip,
+                                                 const std::function<void()> &callback, QWidget *parent)
+{
+    QToolButton *button = new QToolButton(parent);
+    button->setIcon(QIcon(iconPath));
+    button->setIconSize(QSize(64, 64));
+    button->setToolTip(tooltip);
+    button->setAutoRaise(true); // Flat appearance
+    QObject::connect(button, &QToolButton::clicked, callback);
+    return button;
+}
 
 #include "BackgroundColor.h"
 #include <QSettings>
@@ -928,34 +1053,39 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent *event)
 
     m_lastMousePos = downPoint;
 
-    if (m_viewToolbar && event->buttons() == Qt::NoButton)
+    if (_viewToolbar) // Hide or show toolbar based on mouse position
     {
-        const int revealMargin = 30; // e.g., 30 px threshold
-
-        QRect hidden = m_viewToolbar->hiddenRect();
-        QRect revealArea(hidden.left(), hidden.top() - revealMargin, hidden.width(), revealMargin * 2);
-
-        if (revealArea.contains(event->pos()) || m_viewToolbar->underMouse())
+        if (event->buttons() == Qt::NoButton)
         {
-            m_viewToolbar->showAnimated();
-        }
-        else
-        {
-            QTimer::singleShot(2000, [this]() {
-                QPoint globalPos = QCursor::pos();
-                QPoint localPos = mapFromGlobal(globalPos);
-                QRect hidden = m_viewToolbar->hiddenRect();
-                QRect revealArea(hidden.left(), hidden.top() - 30, hidden.width(), 60);
+            // Create a trigger area at the bottom of the widget for showing toolbar
+            int triggerHeight = 50; // Height of area at bottom that triggers toolbar
+            QRect triggerArea(0, height() - triggerHeight, width(), triggerHeight);
 
-                bool isFlyoutVisible = m_viewToolbar->isFlyoutMenuVisible();
+            // Check if mouse is in trigger area OR over visible toolbar
+            bool mouseInTriggerArea = triggerArea.contains(event->pos());
+            bool mouseOverToolbar = _toolbarVisibleRect.contains(event->pos()) &&
+                _viewToolbar->isVisible();
 
-                if (!revealArea.contains(localPos) &&
-                    !m_viewToolbar->underMouse() &&
-                    !isFlyoutVisible)
-                {
-                    m_viewToolbar->hideAnimated();
-                }
-                });
+            if (mouseInTriggerArea || mouseOverToolbar)
+            {
+                // Mouse is in trigger area or over toolbar, show it
+                showToolbarAnimated();
+            }
+            else
+            {
+                // Mouse is outside trigger area, hide the toolbar
+                QTimer::singleShot(2000, [this]() {
+                    // Check if mouse is still outside trigger area and not over toolbar
+                    QPoint globalPos = QCursor::pos();
+                    QPoint localPos = mapFromGlobal(globalPos);
+                    QRect triggerArea(0, height() - 50, width(), 50);
+
+                    if (!triggerArea.contains(localPos) && !_viewToolbar->underMouse())
+                    {
+                        hideToolbarAnimated();
+                    }
+                    });
+            }
         }
     }
 
@@ -1113,31 +1243,46 @@ void ModelViewerWidget::resizeEvent(QResizeEvent *event)
 {
     QOpenGLWidget::resizeEvent(event);
     QWidget::resizeEvent(event);
-    if (m_viewToolbar)
+    if (_viewToolbar)
     {
-        m_viewToolbar->reposition(width(), height()); // Move completely below widget
+        _viewToolbar->adjustSize();
+        QSize toolbarSize = _viewToolbar->size();
+        int margin = 10;
+
+        int x = (width() - toolbarSize.width()) / 2;
+        int y = height() - toolbarSize.height() - margin;
+
+        // Clamp to ensure it's inside bounds
+        x = std::max(0, x);
+        y = std::max(0, y);
+
+        _viewToolbar->move(x, y);
+
+        _toolbarVisibleRect = _viewToolbar->geometry();
+        _toolbarHiddenRect = _toolbarVisibleRect;
+        _toolbarHiddenRect.moveTop(height() + 20); // Move completely below widget
 
     }
 }
 
 void ModelViewerWidget::showToolbarAnimated()
 {
-    /*if (_toolbarAnimation->state() == QAbstractAnimation::Running)
+    if (_toolbarAnimation->state() == QAbstractAnimation::Running)
         _toolbarAnimation->stop();
 
     _toolbarAnimation->setStartValue(_viewToolbar->geometry());
     _toolbarAnimation->setEndValue(_toolbarVisibleRect);
-    _toolbarAnimation->start();*/
+    _toolbarAnimation->start();
 }
 
 void ModelViewerWidget::hideToolbarAnimated()
 {
-   /* if (_toolbarAnimation->state() == QAbstractAnimation::Running)
+    if (_toolbarAnimation->state() == QAbstractAnimation::Running)
         _toolbarAnimation->stop();
 
     _toolbarAnimation->setStartValue(_viewToolbar->geometry());
     _toolbarAnimation->setEndValue(_toolbarHiddenRect);
-    _toolbarAnimation->start();*/
+    _toolbarAnimation->start();
 }
 
 
@@ -1237,6 +1382,51 @@ void ModelViewerWidget::setViewTrimetric()
 {
     m_camera->setView(GLCamera::ViewProjection::TRIMETRIC_VIEW);
     update();
+}
+
+void ModelViewerWidget::onActionIsometricViewTriggered(bool /*checked*/)
+{
+    /*buttonGroupViews->setExclusive(false);
+    QList<QAbstractButton*> buttons = buttonGroupViews->buttons();
+    for (auto b : buttons)
+    {
+        b->setChecked(false);
+    }
+    buttonGroupViews->setExclusive(true);*/
+
+    setViewAxonometric();
+
+    m_toolButtonIsometricView->setDefaultAction(dynamic_cast<QAction*>(sender()));
+}
+
+void ModelViewerWidget::onActionDimetricViewTriggered(bool /*checked*/)
+{
+    /*buttonGroupViews->setExclusive(false);
+    QList<QAbstractButton*> buttons = buttonGroupViews->buttons();
+    for (auto b : buttons)
+    {
+        b->setChecked(false);
+    }
+    buttonGroupViews->setExclusive(true);*/
+
+	setViewDimetric();   
+
+    m_toolButtonIsometricView->setDefaultAction(dynamic_cast<QAction*>(sender()));
+}
+
+void ModelViewerWidget::onActionTrimetricViewTriggered(bool /*checked*/)
+{
+    /*buttonGroupViews->setExclusive(false);
+    QList<QAbstractButton*> buttons = buttonGroupViews->buttons();
+    for (auto b : buttons)
+    {
+        b->setChecked(false);
+    }
+    buttonGroupViews->setExclusive(true);*/
+
+    setViewTrimetric();	
+
+    m_toolButtonIsometricView->setDefaultAction(dynamic_cast<QAction*>(sender()));
 }
 
 
