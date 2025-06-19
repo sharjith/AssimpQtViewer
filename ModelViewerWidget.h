@@ -88,9 +88,6 @@ protected:
 
     void keyReleaseEvent(QKeyEvent *event) override;
 
-    /*void focusInEvent(QFocusEvent* event) override;
-    void focusOutEvent(QFocusEvent* event) override;*/
-
     void resizeEvent(QResizeEvent *event) override;
 
 
@@ -117,9 +114,6 @@ private slots:
     void showAllMeshes();
 
 private:    
-    void showToolbarAnimated();
-    
-    void hideToolbarAnimated();
 
     void setupContextMenu();
 
@@ -192,19 +186,7 @@ private:
     QRect getClientRectFromPoint(const QPoint& pixel);
     QVector3D get3dTranslationVectorFromMousePoints(const QPoint &start, const QPoint &end);
 
-   /* QToolButton *createViewButton(const QString &iconPath, const QString &tooltip,
-                                  const std::function<void()> &callback, QWidget *parent = nullptr);*/
-
-
 private:
-
-    /*FlyOutViewButton* m_toolButtonIsometricView;
-    QAction* m_isometricView;
-    QAction* m_dimetricView;
-    QAction* m_trimetricView;
-    QPropertyAnimation* _toolbarAnimation;
-    QRect _toolbarVisibleRect;
-    QRect _toolbarHiddenRect;*/
 
     ViewToolbar* m_viewToolbar;
 

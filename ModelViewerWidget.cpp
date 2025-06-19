@@ -1116,28 +1116,7 @@ void ModelViewerWidget::resizeEvent(QResizeEvent *event)
     if (m_viewToolbar)
     {
         m_viewToolbar->reposition(width(), height()); // Move completely below widget
-
     }
-}
-
-void ModelViewerWidget::showToolbarAnimated()
-{
-    /*if (_toolbarAnimation->state() == QAbstractAnimation::Running)
-        _toolbarAnimation->stop();
-
-    _toolbarAnimation->setStartValue(_viewToolbar->geometry());
-    _toolbarAnimation->setEndValue(_toolbarVisibleRect);
-    _toolbarAnimation->start();*/
-}
-
-void ModelViewerWidget::hideToolbarAnimated()
-{
-   /* if (_toolbarAnimation->state() == QAbstractAnimation::Running)
-        _toolbarAnimation->stop();
-
-    _toolbarAnimation->setStartValue(_viewToolbar->geometry());
-    _toolbarAnimation->setEndValue(_toolbarHiddenRect);
-    _toolbarAnimation->start();*/
 }
 
 
