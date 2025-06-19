@@ -1098,8 +1098,8 @@ void ModelViewerWidget::mouseReleaseEvent(QMouseEvent *event)
 {
     setCursor(QCursor(Qt::ArrowCursor));
 
-    if (event->button() & Qt::LeftButton || 
-        (event->button() & Qt::LeftButton && event->modifiers() == Qt::ShiftModifier))
+    if ((event->button() & Qt::LeftButton && !(event->modifiers() & Qt::ControlModifier)) ||
+        ((event->button() & Qt::LeftButton && event->modifiers() == Qt::ShiftModifier)))
     {
         const int minRectangleSize = 50; // Minimum width and height in pixels
         if (m_scene && _rubberBand->width() >= minRectangleSize && _rubberBand->height() >= minRectangleSize)
@@ -1508,33 +1508,34 @@ void ModelViewerWidget::pickAtScreenPosition(const QPoint &pos)
 {
     makeCurrent(); // Needed if using Qt with OpenGL
 
-    // Get the viewport dimensions
-    QRect viewportRect(0, 0, width(), height());
+	QRect viewport = getViewportFromPoint(pos);
+    glViewport(viewport.x(), viewport.y(), viewport.width(), viewport.height());
 
-    float x = pos.x();
-    float y = viewportRect.height() - pos.y(); // Flip Y for OpenGL
-    float normalizedX = (x / viewportRect.width()) * 2.0f - 1.0f; // Normalize to [-1, 1]
-    float normalizedY = (y / viewportRect.height()) * 2.0f - 1.0f;
+    int yInverted = height() - pos.y() - 1;
 
-    // Create normalized device coordinates (NDC) for near and far points
-    QVector4D nearPointNDC(normalizedX, normalizedY, -1.0f, 1.0f); // NDC z = -1 for near
-    QVector4D farPointNDC(normalizedX, normalizedY, 1.0f, 1.0f); // NDC z = 1 for far
+    QMatrix4x4 view = m_viewMatrix;
+    QMatrix4x4 projection = m_camera->getProjectionMatrix();
 
-    // Compute the inverse of the transformation matrix
-    QMatrix4x4 viewProjectionMatrix = m_projectionMatrix * m_viewMatrix;
-    QMatrix4x4 inverseViewProjectionMatrix = viewProjectionMatrix.inverted();
+    // Convert to Normalized Device Coordinates [-1, 1]
+    float ndcX = (2.0f * (pos.x() - viewport.x())) / viewport.width() - 1.0f;
+    float ndcY = (2.0f * (yInverted - viewport.y())) / viewport.height() - 1.0f;
 
-    // Unproject the NDC points to world space
-    QVector4D nearPointWorld = inverseViewProjectionMatrix * nearPointNDC;
-    QVector4D farPointWorld = inverseViewProjectionMatrix * farPointNDC;
+    QVector4D nearNDC(ndcX, ndcY, -1.0f, 1.0f); // Near plane
+    QVector4D farNDC(ndcX, ndcY, 1.0f, 1.0f);   // Far plane
 
-    // Perform perspective divide to convert from homogeneous coordinates
-    nearPointWorld /= nearPointWorld.w();
-    farPointWorld /= farPointWorld.w();
+    QMatrix4x4 inv = (projection * view).inverted();
 
+    QVector4D nearWorld = inv * nearNDC;
+    QVector4D farWorld = inv * farNDC;
+
+    // Homogeneous divide
+    nearWorld /= nearWorld.w();
+    farWorld /= farWorld.w();
+
+    
     // Extract ray origin and direction
-    QVector3D rayOrigin = nearPointWorld.toVector3D();
-    QVector3D rayDirection = (farPointWorld.toVector3D() - rayOrigin).normalized();
+    QVector3D rayOrigin = nearWorld.toVector3D();
+    QVector3D rayDirection = (farWorld.toVector3D() - rayOrigin).normalized();
 
     // Convert to aiVector3D if needed
     aiVector3D aiRayOrigin(rayOrigin.x(), rayOrigin.y(), rayOrigin.z());
@@ -1694,7 +1695,7 @@ bool ModelViewerWidget::rayIntersectsTriangle(
 }
 
 void ModelViewerWidget::sweepSelection(const QRect& rubberBandRect)
-{
+{    
     QMatrix4x4 projMatrix = m_camera->getProjectionMatrix();
     QMatrix4x4 viewMatrix = m_camera->getViewMatrix();
     QRect viewport(0, 0, width(), height()); // Screen space rectangle
@@ -2056,6 +2057,61 @@ void ModelViewerWidget::showAllMeshes()
     // Signal MainWindow to check all tree checkboxes
     emit allMeshVisibilityChanged(m_visibilityMap);
 }
+
+QRect ModelViewerWidget::getViewportFromPoint(const QPoint& pixel)
+{
+    QRect viewport;
+    if (m_multiViewEnabled)
+    {
+        // top view
+        if (pixel.x() < width() / 2 && pixel.y() > height() / 2)
+            viewport = QRect(0, 0, width() / 2, height() / 2);
+        // front view
+        if (pixel.x() < width() / 2 && pixel.y() < height() / 2)
+            viewport = QRect(0, height() / 2, width() / 2, height() / 2);
+        // left view
+        if (pixel.x() > width() / 2 && pixel.y() < height() / 2)
+            viewport = QRect(width() / 2, height() / 2, width() / 2, height() / 2);
+        // isometric
+        if (pixel.x() > width() / 2 && pixel.y() > height() / 2)
+            viewport = QRect(width() / 2, 0, width() / 2, height() / 2);
+    }
+    else
+    {
+        // single viewport
+        viewport = QRect(0, 0, width(), height());
+    }
+
+    return viewport;
+}
+
+QRect ModelViewerWidget::getClientRectFromPoint(const QPoint& pixel)
+{
+    QRect clientRect;
+    if (m_multiViewEnabled)
+    {
+        // top view
+        if (pixel.x() < width() / 2 && pixel.y() > height() / 2)
+            clientRect = QRect(0, height() / 2, width() / 2, height() / 2);
+        // front view
+        if (pixel.x() < width() / 2 && pixel.y() < height() / 2)
+            clientRect = QRect(0, 0, width() / 2, height() / 2);
+        // left view
+        if (pixel.x() > width() / 2 && pixel.y() < height() / 2)
+            clientRect = QRect(width() / 2, 0, width() / 2, height() / 2);
+        // isometric
+        if (pixel.x() > width() / 2 && pixel.y() > height() / 2)
+            clientRect = QRect(width() / 2, height() / 2, width() / 2, height() / 2);
+    }
+    else
+    {
+        // single viewport
+        clientRect = QRect(0, 0, width(), height());
+    }
+
+    return clientRect;
+}
+
 
 QVector3D ModelViewerWidget::get3dTranslationVectorFromMousePoints(const QPoint &start, const QPoint &end)
 {

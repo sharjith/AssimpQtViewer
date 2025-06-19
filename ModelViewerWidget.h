@@ -193,6 +193,8 @@ private:
 
     bool checkIfAnyMeshIsHidden() const;
 
+    QRect getViewportFromPoint(const QPoint& pixel);
+    QRect getClientRectFromPoint(const QPoint& pixel);
     QVector3D get3dTranslationVectorFromMousePoints(const QPoint &start, const QPoint &end);
 
     QToolButton *createViewButton(const QString &iconPath, const QString &tooltip,
