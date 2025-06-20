@@ -86,9 +86,29 @@ ViewToolbar::ViewToolbar(QWidget* parent)
     QAction* dim = axoMenu->addAction(QIcon(":/icons/res/dimetric.png"), "Dimetric");
     QAction* tri = axoMenu->addAction(QIcon(":/icons/res/trimetric.png"), "Trimetric");
 
-    connect(iso, &QAction::triggered, this, [this]() { emit axonometricSelected("Isometric"); });
-    connect(dim, &QAction::triggered, this, [this]() { emit axonometricSelected("Dimetric"); });
-    connect(tri, &QAction::triggered, this, [this]() { emit axonometricSelected("Trimetric"); });
+    connect(iso, &QAction::triggered, this, 
+        [this, iso]() 
+        {
+            m_toolButtonIsometricView->setDefaultAction(iso);
+            emit axonometricSelected("Isometric"); 
+        }
+    );
+
+    connect(dim, &QAction::triggered, this, 
+        [this, dim]() 
+        {
+            m_toolButtonIsometricView->setDefaultAction(dim);
+            emit axonometricSelected("Dimetric"); 
+        }
+    );
+
+    connect(tri, &QAction::triggered, this, 
+        [this, tri]() 
+        {
+			m_toolButtonIsometricView->setDefaultAction(tri);
+            emit axonometricSelected("Trimetric"); 
+        }
+    );
 
     m_toolButtonIsometricView->setMenu(axoMenu);
     m_toolButtonIsometricView->setDefaultAction(iso);
