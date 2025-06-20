@@ -18,6 +18,7 @@ class ViewToolbar;
 class FlyOutViewButton;
 class GLCamera;
 class QPropertyAnimation;
+class TextRenderer;
 
 enum class ViewProjection
 {
@@ -267,5 +268,4 @@ private:
 
     std::unique_ptr<Trihedron> m_trihedron; // Trihedron for orientation reference    
     std::unique_ptr<ShaderProgram> m_trihedronShader; // Shader for overlay elements like trihedron
-
 };

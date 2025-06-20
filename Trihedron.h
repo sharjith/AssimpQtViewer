@@ -5,6 +5,8 @@
 #include <QMatrix4x4>
 #include "ShaderProgram.h"
 
+class TextRenderer;
+
 class Trihedron : protected QOpenGLFunctions_3_3_Core
 {
 public:
@@ -30,6 +32,9 @@ private:
     GLuint m_sphereVBO;
     GLuint m_sphereEBO;
     int m_cylinderVertexCount, m_coneVertexCount, m_sphereIndexCount;
+
+    std::unique_ptr<ShaderProgram> m_trihedronTextShader; // Shader for trihedron text labels
+    TextRenderer* m_axisTextRenderer;
 };
 
 #endif // TRIHEDRON_H

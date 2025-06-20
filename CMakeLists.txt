@@ -15,9 +15,10 @@ set(CMAKE_AUTORCC ON)
 # Find Qt
 find_package(Qt6 REQUIRED COMPONENTS Core Gui OpenGLWidgets Widgets OpenGL Concurrent)
 
-# Find OpenGL and Assimp
+# Find OpenGL, Assimp and Freetype
 find_package(OpenGL REQUIRED)
 find_package(assimp REQUIRED)
+find_package(Freetype REQUIRED)
 
 # Main executable
 add_executable(AssimpQtViewer)
@@ -61,6 +62,7 @@ target_link_libraries(AssimpQtViewer PRIVATE
     Qt6::Concurrent
     OpenGL::GL
     assimp::assimp
+    Freetype::Freetype
 )
 
 if(WIN32)

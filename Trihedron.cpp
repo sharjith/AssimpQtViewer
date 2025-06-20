@@ -1,10 +1,18 @@
 #include "Trihedron.h"
+#include "TextRenderer.h"
 
 Trihedron::Trihedron(ShaderProgram *shader)
     : m_shader(shader), m_cylinderVAO(0), m_coneVAO(0), m_sphereVAO(0),
       m_cylinderVertexCount(0), m_coneVertexCount(0), m_sphereIndexCount(0)
 {
     initializeOpenGLFunctions();
+
+    m_trihedronTextShader = std::make_unique<ShaderProgram>();
+    m_trihedronTextShader->loadCompileAndLinkShaderFromFile(":/shaders/shaders/text.vert", ":/shaders/shaders/text.frag");
+    m_trihedronTextShader->bind();
+    m_axisTextRenderer = new TextRenderer(m_trihedronTextShader.get(), 110, 110);
+    m_axisTextRenderer->Load(":/fonts/fonts/arialbd.ttf", 16);
+    m_trihedronTextShader->release();
 
     generateSphereGeometry();
     generateCylinderGeometry();

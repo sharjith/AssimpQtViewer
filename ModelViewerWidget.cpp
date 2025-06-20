@@ -4,6 +4,7 @@
 #include "GLCamera.h"
 #include "FlyOutViewButton.h"
 #include "ViewToolbar.h"
+#include "TextRenderer.h"
 #include <assimp/postprocess.h>
 #include <cfloat>
 #include <QApplication>
@@ -152,6 +153,7 @@ void ModelViewerWidget::initializeGL()
 	m_bgSplitShader = std::make_unique<ShaderProgram>();
     m_bgSplitShader->loadCompileAndLinkShaderFromFile(":/shaders/shaders/splitScreen.vert",
 		":/shaders/shaders/splitScreen.frag");
+
 }
 
 void ModelViewerWidget::resizeGL(int w, int h)

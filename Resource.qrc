@@ -30,5 +30,11 @@
         <file>shaders/mesh.vert</file>
         <file>shaders/splitScreen.frag</file>
         <file>shaders/splitScreen.vert</file>
+        <file>shaders/text.frag</file>
+        <file>shaders/text.vert</file>
+    </qresource>
+    <qresource prefix="/fonts">
+        <file>fonts/arial.ttf</file>
+        <file>fonts/arialbd.ttf</file>
     </qresource>
 </RCC>
