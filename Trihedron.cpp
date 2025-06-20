@@ -11,7 +11,7 @@ Trihedron::Trihedron(ShaderProgram *shader)
     m_trihedronTextShader->loadCompileAndLinkShaderFromFile(":/shaders/shaders/text.vert", ":/shaders/shaders/text.frag");
     m_trihedronTextShader->bind();
     m_axisTextRenderer = new TextRenderer(m_trihedronTextShader.get(), 110, 110);
-    m_axisTextRenderer->Load(":/fonts/fonts/arialbd.ttf", 16);
+    m_axisTextRenderer->Load(":/fonts/fonts/arialbd.ttf", 14);
     m_trihedronTextShader->release();
 
     generateSphereGeometry();
@@ -152,7 +152,7 @@ void Trihedron::generateConeGeometry()
     std::vector<float> vertexData;
     const int segments = 12;
     const float radius = 0.1f;
-    const float height = 0.2f;
+    const float height = 0.25f;
 
     // ===== Base Circle (flat face) =====
     for (int i = 0; i <= segments; ++i)
@@ -366,7 +366,7 @@ void Trihedron::draw(const QMatrix4x4 &viewMatrix, const QMatrix4x4 &projectionM
     model.rotate(90, 0, 1, 0); // Rotate to align with X-axis
     model.scale(scale);
     m_shader->setUniformValue("uColor", QVector3D(1.0f, 0.0f, 0.0f)); // Red color
-    drawCylinder(model);
+    drawCylinder(model);    
 
     model.setToIdentity();
     model.translate(1.0f * scale, 0.0f, 0.0f); // Move to cylinder tip
@@ -397,4 +397,21 @@ void Trihedron::draw(const QMatrix4x4 &viewMatrix, const QMatrix4x4 &projectionM
     model.translate(0.0f, 0.0f, 1.0f * scale); // Move to cylinder tip
     model.scale(scale);
     drawCone(model);
+    
+    m_shader->release();
+
+    // Labels
+    QVector3D xAxis(1.2 * scale, 0, 0);
+    xAxis = xAxis.project(viewMatrix, projectionMatrix, QRect(0, 0, 110, 110));    
+    m_axisTextRenderer->RenderText("X", xAxis.x(), 110 - xAxis.y(), 1, QVector3D(1.0f, 1.0f, 0.0f), TextRenderer::VAlignment::VBOTTOM);
+
+    QVector3D yAxis(0, 1.2 * scale, 0);
+    yAxis = yAxis.project(viewMatrix, projectionMatrix, QRect(0, 0, 110, 110));
+    m_axisTextRenderer->RenderText("Y", yAxis.x() -5, 110 - yAxis.y(), 1, QVector3D(1.0f, 1.0f, 0.0f), TextRenderer::VAlignment::VBOTTOM);
+
+    QVector3D zAxis(0, 0, 1.2 * scale);
+    zAxis = zAxis.project(viewMatrix, projectionMatrix, QRect(0, 0, 110, 110));
+    m_axisTextRenderer->RenderText("Z", zAxis.x() - 5, 110 - zAxis.y(), 1, QVector3D(1.0f, 1.0f, 0.0f), TextRenderer::VAlignment::VBOTTOM);
+
+    m_shader->bind();
 }
