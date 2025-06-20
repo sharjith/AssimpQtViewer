@@ -337,7 +337,7 @@ void Trihedron::drawSphere(const QMatrix4x4 &modelMatrix)
     glBindVertexArray(0);
 }
 
-void Trihedron::draw(const QMatrix4x4 &viewMatrix, const QMatrix4x4 &projectionMatrix)
+void Trihedron::draw(const QMatrix4x4 &viewMatrix, const QMatrix4x4 &projectionMatrix, const float& scale)
 {
     m_shader->bind();
 
@@ -349,37 +349,44 @@ void Trihedron::draw(const QMatrix4x4 &viewMatrix, const QMatrix4x4 &projectionM
 
     // Draw center sphere
     model.setToIdentity();
+	model.scale(scale);
     m_shader->setUniformValue("uColor", QVector3D(1.0f, 1.0f, 1.0f)); // White color
     drawSphere(model);
 
     // Draw X-axis (Red)
     model.setToIdentity();
     model.rotate(90, 0, 1, 0); // Rotate to align with X-axis
+    model.scale(scale);
     m_shader->setUniformValue("uColor", QVector3D(1.0f, 0.0f, 0.0f)); // Red color
     drawCylinder(model);
 
     model.setToIdentity();
-    model.translate(1.0f, 0.0f, 0.0f); // Move to cylinder tip
+    model.translate(1.0f * scale, 0.0f, 0.0f); // Move to cylinder tip
     model.rotate(90, 0, 1, 0); // Align cone along +X-axis
+    model.scale(scale);
     drawCone(model);
 
     // Draw Y-axis (Green)
     model.setToIdentity();
     model.rotate(-90, 1, 0, 0); // Rotate to align with Y-axis
+    model.scale(scale);
     m_shader->setUniformValue("uColor", QVector3D(0.0f, 0.75f, 0.0f)); // Green color
     drawCylinder(model);
 
     model.setToIdentity();
-    model.translate(0.0f, 1.0f, 0.0f); // Move to cylinder tip
+    model.translate(0.0f, 1.0f * scale, 0.0f); // Move to cylinder tip
     model.rotate(-90, 1, 0, 0); // Align cone along +Y-axis
+    model.scale(scale);
     drawCone(model);
 
     // Draw Z-axis (Blue)
     model.setToIdentity();
     m_shader->setUniformValue("uColor", QVector3D(0.0f, 0.0f, 1.0f)); // Blue color
+    model.scale(scale);
     drawCylinder(model);
 
     model.setToIdentity();
-    model.translate(0.0f, 0.0f, 1.0f); // Move to cylinder tip
+    model.translate(0.0f, 0.0f, 1.0f * scale); // Move to cylinder tip
+    model.scale(scale);
     drawCone(model);
 }

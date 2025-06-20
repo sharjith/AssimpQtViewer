@@ -190,7 +190,7 @@ void ModelViewerWidget::paintGL()
     if (!m_multiViewEnabled)
     {
         render(m_camera);
-        drawTrihedronOverlay(0, 0, m_camera); // Draw trihedron in mini viewport
+        drawTrihedronOverlay(0, 0, 1.0f, m_camera); // Draw trihedron in mini viewport
     }
     else
         renderMultiView(); // Render all views in multi-view mode
@@ -297,25 +297,25 @@ void ModelViewerWidget::renderMultiView()
     glViewport(0, 0, width() / 2, height() / 2);
     m_orthoCamera->setView(GLCamera::ViewProjection::TOP_VIEW);
     render(m_orthoCamera);
-	drawTrihedronOverlay(0, 0, m_orthoCamera); // Draw trihedron in mini viewport
+	drawTrihedronOverlay(0, 0, 0.75, m_orthoCamera); // Draw trihedron in mini viewport
     
     // Front View
     glViewport(0, height() / 2, width() / 2, height() / 2);
     m_orthoCamera->setView(GLCamera::ViewProjection::FRONT_VIEW);
     render(m_orthoCamera);
-	drawTrihedronOverlay(0, height() / 2, m_orthoCamera); // Draw trihedron in mini viewport
+	drawTrihedronOverlay(0, height() / 2, 0.75, m_orthoCamera); // Draw trihedron in mini viewport
     
     // Left View
     glViewport(width() / 2, height() / 2, width() / 2, height() / 2);
     m_orthoCamera->setView(GLCamera::ViewProjection::LEFT_VIEW);
     render(m_orthoCamera);
-	drawTrihedronOverlay(width() / 2, height() / 2, m_orthoCamera); // Draw trihedron in mini viewport
+	drawTrihedronOverlay(width() / 2, height() / 2, 0.75, m_orthoCamera); // Draw trihedron in mini viewport
     
     // Render isometric view with primary camera
     // Isometric View
     glViewport(width() / 2, 0, width() / 2, height() / 2);	
     render(m_camera);    
-	drawTrihedronOverlay(width() / 2, 0, m_camera); // Draw trihedron in mini viewport
+	drawTrihedronOverlay(width() / 2, 0, 0.75, m_camera); // Draw trihedron in mini viewport
 
 	m_shader->release(); // Release the shader after rendering
 	splitScreen(); // Draw split screen lines
@@ -537,7 +537,7 @@ void ModelViewerWidget::loadBgColorSettings()
     }
 }
 
-void ModelViewerWidget::drawTrihedronOverlay(int xOffset, int yOffset, GLCamera* camera)
+void ModelViewerWidget::drawTrihedronOverlay(int xOffset, int yOffset, float scale, GLCamera* camera)
 {
     const int overlaySize = 110; // Size of mini viewport
     const int margin = 10; // Margin from the bottom-left corner
@@ -578,7 +578,7 @@ void ModelViewerWidget::drawTrihedronOverlay(int xOffset, int yOffset, GLCamera*
     // Draw the trihedron
     if (m_trihedron)
     {
-        m_trihedron->draw(view, projection);
+        m_trihedron->draw(view, projection, scale);
     }
 
     // Restore the viewport to the main scene

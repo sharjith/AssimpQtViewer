@@ -136,7 +136,7 @@ private:
 
     void loadBgColorSettings();
 
-    void drawTrihedronOverlay(int xOffset, int yOffset, GLCamera* camera);
+    void drawTrihedronOverlay(int xOffset, int yOffset, float scale, GLCamera* camera);
 
     void updateCamera();
 

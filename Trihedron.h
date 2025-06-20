@@ -22,7 +22,7 @@ public:
 
     void drawSphere(const QMatrix4x4 &modelMatrix);
 
-    void draw(const QMatrix4x4 &viewMatrix, const QMatrix4x4 &projectionMatrix);
+    void draw(const QMatrix4x4 &viewMatrix, const QMatrix4x4 &projectionMatrix, const float& scale = 1.0f);
 
 private:
     ShaderProgram* m_shader;
