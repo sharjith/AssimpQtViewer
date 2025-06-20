@@ -541,7 +541,7 @@ void ModelViewerWidget::loadBgColorSettings()
 
 void ModelViewerWidget::drawTrihedronOverlay(int xOffset, int yOffset, float scale, GLCamera* camera)
 {
-    const int overlaySize = 110; // Size of mini viewport
+    const int overlaySize = 125; // Size of mini viewport
     const int margin = 10; // Margin from the bottom-left corner
 
     // Set up the mini viewport
@@ -558,13 +558,13 @@ void ModelViewerWidget::drawTrihedronOverlay(int xOffset, int yOffset, float sca
     } else
     {
         // Orthographic projection for overlay
-        float orthoSize = 1.15f;
+        float orthoSize = 1.7f;
         projection.ortho(-orthoSize, orthoSize, -orthoSize, orthoSize, 0.1f, 10.0f);
     }
 
     // Create view matrix for overlay
     QMatrix4x4 view;
-    view.lookAt(QVector3D(0.0, 0.0, 5.0), // Eye position
+    view.lookAt(QVector3D(0.0, 0.0, 7.0), // Eye position
                 QVector3D(0.0, 0.0, 0.0), // Target position (origin)
                 QVector3D(0.0, 1.0, 0.0)); // Up vector
 
