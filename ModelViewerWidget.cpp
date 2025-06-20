@@ -299,27 +299,32 @@ void ModelViewerWidget::renderMultiView()
     glViewport(0, 0, width() / 2, height() / 2);
     m_orthoCamera->setView(GLCamera::ViewProjection::TOP_VIEW);
     render(m_orthoCamera);
-	drawTrihedronOverlay(0, 0, 0.75, m_orthoCamera); // Draw trihedron in mini viewport
-    
+
     // Front View
     glViewport(0, height() / 2, width() / 2, height() / 2);
     m_orthoCamera->setView(GLCamera::ViewProjection::FRONT_VIEW);
     render(m_orthoCamera);
-	drawTrihedronOverlay(0, height() / 2, 0.75, m_orthoCamera); // Draw trihedron in mini viewport
-    
+
     // Left View
     glViewport(width() / 2, height() / 2, width() / 2, height() / 2);
     m_orthoCamera->setView(GLCamera::ViewProjection::LEFT_VIEW);
     render(m_orthoCamera);
-	drawTrihedronOverlay(width() / 2, height() / 2, 0.75, m_orthoCamera); // Draw trihedron in mini viewport
-    
+
     // Render isometric view with primary camera
     // Isometric View
     glViewport(width() / 2, 0, width() / 2, height() / 2);	
-    render(m_camera);    
+    render(m_camera);
+
+    m_shader->release(); // Release the shader after rendering
+
+    // All viewport trihedra should be drawn together after the model rendering to avoid blending artifacts
+    drawTrihedronOverlay(0, 0, 0.75, m_orthoCamera); // Draw trihedron in mini viewport
+    drawTrihedronOverlay(0, height() / 2, 0.75, m_orthoCamera); // Draw trihedron in mini viewport
+    drawTrihedronOverlay(width() / 2, height() / 2, 0.75, m_orthoCamera); // Draw trihedron in mini viewport
 	drawTrihedronOverlay(width() / 2, 0, 0.75, m_camera); // Draw trihedron in mini viewport
 
-	m_shader->release(); // Release the shader after rendering
+    m_trihedronShader->release();
+
 	splitScreen(); // Draw split screen lines
 
     // restore the original projection type of the main camera
