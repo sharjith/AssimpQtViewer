@@ -907,7 +907,7 @@ void ModelViewerWidget::mouseMoveEvent(QMouseEvent *event)
             m_viewRadius *= 1.05f;
 
         // Translate to focus on mouse center
-        QPoint cen = QRect(0, 0, width(), height()).center();
+        QPoint cen = getClientRectFromPoint(downPoint).center();
         float sign = (downPoint.x() > m_lastMousePos.x() || downPoint.y() < m_lastMousePos.y()) ? 1.0f : -1.0f;
         QVector3D OP = get3dTranslationVectorFromMousePoints(cen, event->position().toPoint());
         OP *= sign * 0.05f;
@@ -1026,14 +1026,14 @@ void ModelViewerWidget::wheelEvent(QWheelEvent *event)
             m_viewRadius /= zoomFactor;
 
         // Translate to focus on mouse center
-        QPoint cen = QRect(0, 0, width(), height()).center();
+        QPoint cen = getClientRectFromPoint(event->position().toPoint()).center();
         float sign = (event->position().x() > cen.x() || event->position().y() < cen.y() ||
                       (event->position().x() < cen.x() && event->position().y() > cen.y())) && (zoomStep > 0)
                          ? 1.0f
                          : -1.0f;
         QVector3D OP = get3dTranslationVectorFromMousePoints(cen, event->position().toPoint());
         OP *= sign * 0.05f;
-        m_camera->move(OP.x(), OP.y(), OP.z());
+        m_camera->move(OP.x(), OP.y(), OP.z());       
 
         // Add to velocities instead of overriding
         m_zoomVelocity += sign * 0.1f; // Tune factor
@@ -1269,7 +1269,7 @@ void ModelViewerWidget::onInertiaTimeout()
             m_viewRadius *= zoomFactor;
 
         // Zoom-centric pan
-        QPoint cen = rect().center();
+        QPoint cen = getViewportFromPoint(mapFromGlobal(QCursor::pos())).center();
         QVector3D OP = get3dTranslationVectorFromMousePoints(cen, cen);
         OP *= -m_zoomPanVelocity * 0.05f;
         m_camera->move(OP.x(), OP.y(), OP.z());
@@ -1294,12 +1294,9 @@ void ModelViewerWidget::onInertiaTimeout()
 
 
 void ModelViewerWidget::pickAtScreenPosition(const QPoint &pos)
-{
-    makeCurrent(); // Needed if using Qt with OpenGL
-
+{ 
 	QRect viewport = getViewportFromPoint(pos);
-    glViewport(viewport.x(), viewport.y(), viewport.width(), viewport.height());
-
+    
     int yInverted = height() - pos.y() - 1;
 
     QMatrix4x4 view = m_viewMatrix;
@@ -1851,7 +1848,7 @@ QRect ModelViewerWidget::getViewportFromPoint(const QPoint& pixel)
 {
     QRect viewport;
     if (m_multiViewEnabled)
-    {
+    {		
         // top view
         if (pixel.x() < width() / 2 && pixel.y() > height() / 2)
             viewport = QRect(0, 0, width() / 2, height() / 2);
@@ -1904,7 +1901,7 @@ QRect ModelViewerWidget::getClientRectFromPoint(const QPoint& pixel)
 
 QVector3D ModelViewerWidget::get3dTranslationVectorFromMousePoints(const QPoint &start, const QPoint &end)
 {
-    QRect viewport(0, 0, width(), height());
+	QRect viewport = getViewportFromPoint(start);
     GLCamera *camera = m_camera;
     QMatrix4x4 view = camera->getViewMatrix();
     QMatrix4x4 projection = camera->getProjectionMatrix();
