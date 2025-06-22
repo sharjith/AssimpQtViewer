@@ -1768,6 +1768,7 @@ void ModelViewerWidget::showOnlySelectedMeshes()
     emit allMeshVisibilityChanged(m_visibilityMap);
     centerSelectedMeshes(); // Center on selected meshes
     clearSelection(); // Clear selection after showing
+	fitToView(); // Reset camera to fit selected meshes
     update();
 }
 
