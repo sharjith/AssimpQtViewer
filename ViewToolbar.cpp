@@ -2,7 +2,9 @@
 #include "ViewToolbar.h"
 #include "FlyOutViewButton.h"
 #include <QHBoxLayout>
+#include <QPushButton>
 #include <QToolButton>
+#include <QButtonGroup>
 #include <QMenu>
 #include <QAction>
 
@@ -12,16 +14,85 @@ ViewToolbar::ViewToolbar(QWidget* parent)
     setStyleSheet("background: rgba(255, 255, 255, 100); border: 1px solid gray; border-radius: 4px;");
     setFixedHeight(64);
 
+    QString buttonStyleSheet(
+        "QToolButton {"
+        "    border: none;"
+        "    background: transparent;"
+        "    padding: 5px;"
+        "    border-radius: 4px;"
+        "}"
+        "QToolButton:hover {"
+        "    background-color: rgba(0, 120, 215, 50);"
+        "    border: 1px solid #0078D7;"
+        "}"
+        "QToolButton:pressed {"
+        "    background-color: rgba(0, 120, 215, 100);"
+        "    border: 1px solid #005A9E;"
+        "}"
+        "QToolButton:checked {"
+        "    background-color: rgba(0, 150, 100, 100);"
+        "    border: 1px solid #008000;"
+        "    color: white;"
+        "}"
+    );
+
+    QString flyoutStyleSheet(
+        "QMenu {"
+        "    background-color: rgba(255, 255, 255, 100);"
+        "    border: 1px solid gray;"
+        "    border-radius: 4px;"
+        "    padding: 2px;"
+        "    icon-size: 42px;"
+        "}"
+        "QMenu::item {"
+        "    background: transparent;"
+        "    background-color: #f0f0f0;"
+        "    border: 1px solid #c0c0c0;"
+        "    border-radius: 4px;"
+        "    padding: 5px 8px;"
+        "    margin: 3px;"
+        "    min-width: 120px;"
+        "    min-height: 30px;"
+        "    font-weight: normal;"
+        "    color: black;"
+        "}"
+        "QMenu::item:selected {"
+        "    background-color: #e0e0ff;"
+        "    border: 1px solid #a0a0ff;"
+        "    color: black;"
+        "}"
+        "QMenu::item:pressed {"
+        "    background-color: #d0d0ff;"
+        "    border: 1px solid #8080ff;"
+        "    color: black;"
+        "}"
+        "QMenu::icon {"
+        "    padding-left: 10px;"
+        "    padding-right: 8px;"
+        "}"
+        "QMenu::separator {"
+        "    height: 1px;"
+        "    background-color: #c0c0c0;"
+        "    margin: 4px 8px;"
+        "}"
+    );
+
     QHBoxLayout* layout = new QHBoxLayout(this);
     layout->setContentsMargins(4, 4, 4, 4);
     layout->setSpacing(6);
 
-    auto createBtn = [this, layout](const QString& icon, const QString& tooltip, const QString& view) {
+    // Group the buttons so that only one can be checked at a time
+    QButtonGroup* buttonGroup = new QButtonGroup(this);
+    buttonGroup->setExclusive(true); // This ensures radio-button behavior
+    auto createBtn = [this, layout, buttonStyleSheet, buttonGroup](const QString& icon, const QString& tooltip, const QString& view) {
         QToolButton* btn = new QToolButton(this);
         btn->setIcon(QIcon(icon));
         btn->setIconSize(QSize(64, 64));
         btn->setToolTip(tooltip);
         btn->setAutoRaise(true);
+        btn->setStyleSheet(buttonStyleSheet);
+        btn->setCheckable(true);
+        buttonGroup->addButton(btn);
         layout->addWidget(btn);
         connect(btn, &QToolButton::clicked, this, [this, view]() { emit viewSelected(view); });
     };
@@ -40,6 +111,17 @@ ViewToolbar::ViewToolbar(QWidget* parent)
     m_toolButtonIsometricView->setPopupMode(QToolButton::DelayedPopup);
     m_toolButtonIsometricView->setAutoRaise(true);
     layout->addWidget(m_toolButtonIsometricView);
+
+    // When this button is clicked, uncheck all buttons in the group
+    connect(m_toolButtonIsometricView, &QPushButton::clicked, this, [=]() {
+        buttonGroup->setExclusive(false);
+        for (QAbstractButton* btn : buttonGroup->buttons())
+        {
+            QSignalBlocker blocker(btn);
+            btn->setChecked(false);
+        }
+        buttonGroup->setExclusive(true);
+        });
 
     QMenu* axoMenu = new QMenu;
     axoMenu->setStyleSheet(
@@ -115,6 +197,7 @@ ViewToolbar::ViewToolbar(QWidget* parent)
 
     QToolButton* fitBtn = new QToolButton(this);
     fitBtn->setIcon(QIcon(":/icons/res/fit-all.png"));
+    fitBtn->setStyleSheet(buttonStyleSheet);
     fitBtn->setIconSize(QSize(64, 64));
     fitBtn->setToolTip("Fit All");
     fitBtn->setAutoRaise(true);
@@ -123,16 +206,29 @@ ViewToolbar::ViewToolbar(QWidget* parent)
 
     QToolButton* multiBtn = new QToolButton(this);
     multiBtn->setIcon(QIcon(":/icons/res/multiview.png"));
+    multiBtn->setStyleSheet(buttonStyleSheet);
     multiBtn->setIconSize(QSize(64, 64));
     multiBtn->setToolTip("Toggle Multi-View");
     multiBtn->setCheckable(true);
     multiBtn->setAutoRaise(true);
     layout->addWidget(multiBtn);
     connect(multiBtn, &QToolButton::toggled, this, [this](bool checked) { emit multiViewToggled(checked); });
+    // When this button is clicked, uncheck all buttons in the group
+    connect(multiBtn, &QPushButton::clicked, this, [=]() {
+        buttonGroup->setExclusive(false);
+        for (QAbstractButton* btn : buttonGroup->buttons())
+        {
+            QSignalBlocker blocker(btn);
+            btn->setChecked(false);
+        }
+        buttonGroup->setExclusive(true);
+        });
+
 
     QToolButton* projToggleButton = new QToolButton(this);
     projToggleButton->setCheckable(true);
     projToggleButton->setIcon(QIcon(":/icons/res/Perspective.png"));
+    projToggleButton->setStyleSheet(buttonStyleSheet);
     projToggleButton->setIconSize(QSize(64, 64));
     projToggleButton->setToolTip("Toggle Projection");
     layout->addWidget(projToggleButton);
