@@ -87,7 +87,7 @@ ViewToolbar::ViewToolbar(QWidget* parent)
     auto createBtn = [this, layout, buttonStyleSheet, buttonGroup](const QString& icon, const QString& tooltip, const QString& view) {
         QToolButton* btn = new QToolButton(this);
         btn->setIcon(QIcon(icon));
-        btn->setIconSize(QSize(64, 64));
+        btn->setIconSize(QSize(48, 48));
         btn->setToolTip(tooltip);
         btn->setAutoRaise(true);
         btn->setStyleSheet(buttonStyleSheet);
@@ -106,7 +106,7 @@ ViewToolbar::ViewToolbar(QWidget* parent)
 
     m_toolButtonIsometricView = new FlyOutViewButton(this);
     m_toolButtonIsometricView->setIcon(QIcon(":/icons/res/isometric.png"));
-    m_toolButtonIsometricView->setIconSize(QSize(64, 64));
+    m_toolButtonIsometricView->setIconSize(QSize(48, 48));
     m_toolButtonIsometricView->setToolTip("Axonometric View");
     m_toolButtonIsometricView->setPopupMode(QToolButton::DelayedPopup);
     m_toolButtonIsometricView->setAutoRaise(true);
@@ -198,7 +198,7 @@ ViewToolbar::ViewToolbar(QWidget* parent)
     QToolButton* fitBtn = new QToolButton(this);
     fitBtn->setIcon(QIcon(":/icons/res/fit-all.png"));
     fitBtn->setStyleSheet(buttonStyleSheet);
-    fitBtn->setIconSize(QSize(64, 64));
+    fitBtn->setIconSize(QSize(48, 48));
     fitBtn->setToolTip("Fit All");
     fitBtn->setAutoRaise(true);
     layout->addWidget(fitBtn);
@@ -207,7 +207,7 @@ ViewToolbar::ViewToolbar(QWidget* parent)
     QToolButton* multiBtn = new QToolButton(this);
     multiBtn->setIcon(QIcon(":/icons/res/multiview.png"));
     multiBtn->setStyleSheet(buttonStyleSheet);
-    multiBtn->setIconSize(QSize(64, 64));
+    multiBtn->setIconSize(QSize(48, 48));
     multiBtn->setToolTip("Toggle Multi-View");
     multiBtn->setCheckable(true);
     multiBtn->setAutoRaise(true);
@@ -229,7 +229,7 @@ ViewToolbar::ViewToolbar(QWidget* parent)
     projToggleButton->setCheckable(true);
     projToggleButton->setIcon(QIcon(":/icons/res/Perspective.png"));
     projToggleButton->setStyleSheet(buttonStyleSheet);
-    projToggleButton->setIconSize(QSize(64, 64));
+    projToggleButton->setIconSize(QSize(48, 48));
     projToggleButton->setToolTip("Toggle Projection");
     layout->addWidget(projToggleButton);
 
@@ -294,7 +294,7 @@ void ViewToolbar::paintEvent(QPaintEvent* event)
     painter.setRenderHint(QPainter::Antialiasing);
 
     QRect r = rect();
-    QColor bg(255, 255, 255, 180);
+    QColor bg(255, 255, 255, 100);
     QColor border(100, 100, 100, 160);
 
     // Draw rounded rectangle background
