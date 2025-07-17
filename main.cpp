@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
     QSurfaceFormat format;
     format.setDepthBufferSize(24);
     format.setStencilBufferSize(8);
-    format.setVersion(3, 3); // or your desired OpenGL version
+    format.setVersion(4, 5); // OpenGL version 4.5
     format.setProfile(QSurfaceFormat::CoreProfile);
     format.setOption(QSurfaceFormat::DebugContext);
     format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
