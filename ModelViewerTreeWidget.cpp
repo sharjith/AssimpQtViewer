@@ -42,7 +42,7 @@ void ModelViewerTreeWidget::createContextMenu()
             this, &ModelViewerTreeWidget::expandAllChildren);
 
     // Create expand to first level action
-    m_expandFirstLevelAction = new QAction("Expand to 1st Level", this);
+    m_expandFirstLevelAction = new QAction("Expand/Collapse to 1st Level", this);
     m_expandFirstLevelAction->setIcon(QIcon(":/icons/res/expand.png"));
     connect(m_expandFirstLevelAction, &QAction::triggered,
             this, &ModelViewerTreeWidget::expandToFirstLevel);
