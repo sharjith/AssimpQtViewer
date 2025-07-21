@@ -1389,15 +1389,10 @@ void ModelViewerWidget::pickRay(const aiVector3D &origin, const aiVector3D &dir)
                 continue; // Skip invisible meshes
             }
 
-            glMesh->getBoundingSphere(cen, radius);
+            glMesh->getBoundingSphere(cen, radius); // The bounding sphere is already transformed
             aiVector3D center(cen.x(), cen.y(), cen.z()); // Convert to aiVector3D
-            //center *= transform; // Apply transformation to center
-
-            QVector3D transformedCenter = QVector3D(center.x, center.y, center.z);
-            transformedCenter = (convertAiMatrixToQMatrix(transform) * QVector4D(transformedCenter, 1.0)).toVector3D();
-            aiVector3D globalCenter(transformedCenter.x(), transformedCenter.y(), transformedCenter.z());
-
-            if (!rayIntersectsSphere(origin, dir, globalCenter, radius))
+                                    
+            if (!rayIntersectsSphere(origin, dir, center, radius))
             {
                 continue; // Skip this mesh entirely
             }
