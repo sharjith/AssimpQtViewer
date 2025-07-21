@@ -56,7 +56,12 @@ void GLMesh::setupMesh()
     {
         Vertex v;
         v.position = QVector3D(m_mesh->mVertices[i].x, m_mesh->mVertices[i].y, m_mesh->mVertices[i].z) * m_modelMatrix;
-        v.normal = QVector3D(m_mesh->mNormals[i].x, m_mesh->mNormals[i].y, m_mesh->mNormals[i].z) * m_modelMatrix;
+
+
+		// Use inverted transpose of the model matrix for normals
+		QMatrix4x4 normalMatrix = m_modelMatrix.inverted().transposed();
+		QVector3D transformedNormal = (normalMatrix * QVector4D(m_mesh->mNormals[i].x, m_mesh->mNormals[i].y, m_mesh->mNormals[i].z, 0.0f)).toVector3D();
+		v.normal = transformedNormal.normalized();
 
         if (m_mesh->HasTextureCoords(0))
         {
