@@ -265,8 +265,7 @@ void GLMesh::draw()
 
 void GLMesh::setModelMatrix(const QMatrix4x4 &mat)
 {
-    m_modelMatrix = mat;
-	qDebug() << "Mesh: " << m_name << " - Model matrix set:" << m_modelMatrix;
+    m_modelMatrix = mat;	
 }
 
 const QMatrix4x4 &GLMesh::modelMatrix() const
