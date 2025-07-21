@@ -231,9 +231,9 @@ void ModelViewerWidget::render(GLCamera* camera)
         m_shader->setUniformValue("ambientColor", ambient);
         m_shader->setUniformValue("shininess", shininess);
 
-        m_shader->setUniformValue("mvp", m_projectionMatrix * m_viewMatrix);
+        m_shader->setUniformValue("projection", m_projectionMatrix);
         m_shader->setUniformValue("view", m_viewMatrix);
-
+        
         for (const auto& meshptr : m_glMeshes)
         {
             GLMesh* mesh = meshptr.get(); // Use smart pointer to access raw pointer
@@ -244,9 +244,8 @@ void ModelViewerWidget::render(GLCamera* camera)
                 continue;
             }
 
-
             m_shader->setUniformValue("specularColor", mesh->material().specular);
-            m_shader->setUniformValue("model", mesh->modelMatrix());
+            m_shader->setUniformValue("model", QMatrix4x4());
 
             // Check if this mesh should be highlighted
             // Fast lookup using reverse mapping
@@ -628,7 +627,7 @@ void ModelViewerWidget::loadModel(const QString &filePath)
 
     if (m_scene->mRootNode)
     {
-        loadNodeMeshes(m_scene->mRootNode);
+        loadNodeMeshes(m_scene->mRootNode, aiMatrix4x4());
 
         for (const auto &pair: m_meshIndexToGLMesh)
         {
@@ -642,23 +641,45 @@ void ModelViewerWidget::loadModel(const QString &filePath)
     update();
 }
 
-void ModelViewerWidget::loadNodeMeshes(aiNode *node)
+// Function to convert aiMatrix4x4 to QMatrix4x4
+QMatrix4x4 convertAiMatrixToQMatrix(const aiMatrix4x4& aiMat)
 {
+    QMatrix4x4 qMat;
+
+    // Assign elements directly.
+    // Assimp's aiMatrix4x4 members are named a1, a2, a3, a4 for the first column,
+    // b1, b2, b3, b4 for the second, and so on.
+    // QMatrix4x4's constructor takes elements in row-major order.
+    qMat.setRow(0, QVector4D(aiMat.a1, aiMat.b1, aiMat.c1, aiMat.d1));
+    qMat.setRow(1, QVector4D(aiMat.a2, aiMat.b2, aiMat.c2, aiMat.d2));
+    qMat.setRow(2, QVector4D(aiMat.a3, aiMat.b3, aiMat.c3, aiMat.d3));
+    qMat.setRow(3, QVector4D(aiMat.a4, aiMat.b4, aiMat.c4, aiMat.d4));
+
+    return qMat;
+}
+
+void ModelViewerWidget::loadNodeMeshes(aiNode* node, const aiMatrix4x4& parentTransform)
+{
+    // Compute global transformation matrix for the current node
+    aiMatrix4x4 globalTransform = parentTransform * node->mTransformation;
+
     // Load meshes for this node
     for (unsigned int i = 0; i < node->mNumMeshes; ++i)
     {
         unsigned int meshIndex = node->mMeshes[i];
-        aiMesh *mesh = m_scene->mMeshes[meshIndex];
+        aiMesh* mesh = m_scene->mMeshes[meshIndex];
 
-        // compute bounding sphere for the mesh
+        // Compute bounding sphere for the mesh using global transformation
         aiVector3D oCenter;
         float oRadius;
-        computeBoundingSphere(mesh, node->mTransformation, oCenter, oRadius);
+        computeBoundingSphere(mesh, globalTransform, oCenter, oRadius);
 
-        //GLMesh* glMesh = new GLMesh(mesh, m_shader.program());
         auto glMesh = std::make_unique<GLMesh>(mesh, m_shader.get());
 
         glMesh->setBoundingSphere(QVector3D(oCenter.x, oCenter.y, oCenter.z), oRadius);
+
+        // Set global model matrix
+        glMesh->setModelMatrix(convertAiMatrixToQMatrix(globalTransform));
 
         // Set up material
         Material mat;
@@ -668,7 +689,7 @@ void ModelViewerWidget::loadNodeMeshes(aiNode *node)
 
         if (mesh->mMaterialIndex >= 0)
         {
-            aiMaterial *material = m_scene->mMaterials[mesh->mMaterialIndex];
+            aiMaterial* material = m_scene->mMaterials[mesh->mMaterialIndex];
             aiColor4D c;
             float opacity = 1.0f;
             if (AI_SUCCESS == material->Get(AI_MATKEY_COLOR_AMBIENT, c))
@@ -703,17 +724,17 @@ void ModelViewerWidget::loadNodeMeshes(aiNode *node)
         glMesh->setupMesh();
 
         // Store associations - use raw pointer
-        GLMesh *rawPtr = glMesh.get();
+        GLMesh* rawPtr = glMesh.get();
         m_nodeMeshes[node].push_back(rawPtr);
         m_meshIndexToGLMesh[meshIndex] = rawPtr; // Store raw pointer
 
         m_glMeshes.emplace_back(std::move(glMesh));
     }
 
-    // Recursively process child nodes
+    // Recursively process child nodes with updated transformation
     for (unsigned int i = 0; i < node->mNumChildren; ++i)
     {
-        loadNodeMeshes(node->mChildren[i]);
+        loadNodeMeshes(node->mChildren[i], globalTransform);
     }
 }
 
@@ -1370,7 +1391,12 @@ void ModelViewerWidget::pickRay(const aiVector3D &origin, const aiVector3D &dir)
 
             glMesh->getBoundingSphere(cen, radius);
             aiVector3D center(cen.x(), cen.y(), cen.z()); // Convert to aiVector3D
-            center *= transform; // Apply transformation to center
+            //center *= transform; // Apply transformation to center
+
+            QVector3D transformedCenter = QVector3D(center.x, center.y, center.z);
+            transformedCenter = (convertAiMatrixToQMatrix(transform) * QVector4D(transformedCenter, 1.0)).toVector3D();
+            aiVector3D globalCenter(transformedCenter.x(), transformedCenter.y(), transformedCenter.z());
+
             if (!rayIntersectsSphere(origin, dir, center, radius))
             {
                 continue; // Skip this mesh entirely

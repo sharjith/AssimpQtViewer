@@ -17,7 +17,7 @@ out vec3 fragPos;
 out vec3 fragTangent;
 out vec3 fragBitangent;
 
-uniform mat4 mvp;
+uniform mat4 projection;
 uniform mat4 model;
 uniform mat4 view;
 
@@ -31,5 +31,5 @@ void main() {
     fragBitangent = normalize(mat3(model) * bitangent);
     vColor = vertexColor;
     vTexCoord = vertexTexCoord;  // ADD: Pass texture coordinates
-    gl_Position = mvp * vec4(vertexPosition, 1.0);
+    gl_Position = projection * view * model * vec4(vertexPosition, 1.0);
 }

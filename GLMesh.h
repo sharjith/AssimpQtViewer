@@ -51,6 +51,8 @@ public:
 
     ~GLMesh();
 
+	QString name() const { return m_name; }
+
     void setMaterial(const Material &material);
 
     void setupMesh();
@@ -105,6 +107,8 @@ public:
 
 private:
     aiMesh *m_mesh = nullptr;
+
+	QString m_name;
 
     QOpenGLBuffer m_vbo{QOpenGLBuffer::VertexBuffer};
     QOpenGLBuffer m_ebo{QOpenGLBuffer::IndexBuffer};

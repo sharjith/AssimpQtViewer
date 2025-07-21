@@ -5,6 +5,8 @@
 
 GLMesh::GLMesh(aiMesh *mesh, QOpenGLShaderProgram *program) : m_mesh(mesh), m_program(program), m_textureId(0)
 {
+	m_name = QString::fromStdString(mesh->mName.C_Str());
+	m_name = m_name.isEmpty() ? QString("Mesh") : m_name;
     initializeOpenGLFunctions();
 }
 
@@ -53,8 +55,8 @@ void GLMesh::setupMesh()
     for (unsigned int i = 0; i < m_mesh->mNumVertices; ++i)
     {
         Vertex v;
-        v.position = QVector3D(m_mesh->mVertices[i].x, m_mesh->mVertices[i].y, m_mesh->mVertices[i].z);
-        v.normal = QVector3D(m_mesh->mNormals[i].x, m_mesh->mNormals[i].y, m_mesh->mNormals[i].z);
+        v.position = QVector3D(m_mesh->mVertices[i].x, m_mesh->mVertices[i].y, m_mesh->mVertices[i].z) * m_modelMatrix;
+        v.normal = QVector3D(m_mesh->mNormals[i].x, m_mesh->mNormals[i].y, m_mesh->mNormals[i].z) * m_modelMatrix;
 
         if (m_mesh->HasTextureCoords(0))
         {
@@ -259,6 +261,7 @@ void GLMesh::draw()
 void GLMesh::setModelMatrix(const QMatrix4x4 &mat)
 {
     m_modelMatrix = mat;
+	qDebug() << "Mesh: " << m_name << " - Model matrix set:" << m_modelMatrix;
 }
 
 const QMatrix4x4 &GLMesh::modelMatrix() const

@@ -118,7 +118,7 @@ private:
 
     void setupContextMenu();
 
-    void loadNodeMeshes(aiNode *node);
+    void loadNodeMeshes(aiNode* node, const aiMatrix4x4& parentTransform);
 
     MaterialTextures loadMaterialTextures(const aiMaterial *material, unsigned int materialIndex);
 
